@@ -1,4 +1,4 @@
-# Accelerated Training for Massive Classification via Dynamic Class Selection (HF-Softmax)
+# Accelerated Training for Massive Classification via Dynamic Class Selection (HF-Softmax) [![pdf](https://img.shields.io/badge/Arxiv-pdf-orange.svg?style=flat)](https://arxiv.org/abs/1801.01687)
 
 Code is on the way.
 
