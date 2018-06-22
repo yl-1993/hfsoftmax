@@ -2,7 +2,6 @@
 
 dataset_path=$1
 num_classes=85164
-GPU=4,5,6,7
 GPU=0,1,2,3
 
 
