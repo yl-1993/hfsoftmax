@@ -2,7 +2,7 @@ import os
 import argparse
 import numpy as np
 from utils import bin_loader, normalize
-from verify import evaluate
+from evaluation import evaluate
 
 
 parser = argparse.ArgumentParser(description='Evaluation')
