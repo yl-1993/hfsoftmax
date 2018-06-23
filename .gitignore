@@ -2,3 +2,4 @@
 *.pth.tar
 *.pyc
 *.npy
+*.swp
