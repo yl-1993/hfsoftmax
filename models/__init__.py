@@ -1,2 +1,2 @@
 from .resnet import *
-from .classifier import Classifier
+from .classifier import Classifier, HFClassifier
