@@ -1,0 +1,6 @@
+h5py
+numpy
+zmq
+annoy
+matplotlib
+mpi4py
