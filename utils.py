@@ -1,9 +1,31 @@
 import numpy as np
 import torch
+import torch.distributed as dist
 import os
 import io
 import pickle
 from PIL import Image
+import multiprocessing as mp
+
+
+def init_processes(addr, port, gpu_num, backend):
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    size = comm.Get_size()
+    rank = comm.Get_rank()
+    print(rank, size)
+    if mp.get_start_method(allow_none=True) != 'spawn':
+        mp.set_start_method('spawn')
+    torch.cuda.set_device(rank % gpu_num)
+    os.environ['MASTER_ADDR'] = addr
+    os.environ['MASTER_PORT'] = port
+    os.environ['WORLD_SIZE'] = str(size)
+    os.environ['RANK'] = str(rank)
+    dist.init_process_group(backend)
+    # dist.init_process_group(backend, rank=rank, world_size=size)
+    # torch.cuda.set_device(0)
+    print('initialize {} successfully (rank {})'.format(backend, rank))
+    return rank, size
 
 
 class AverageMeter(object):

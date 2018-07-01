@@ -1,3 +1,7 @@
+import multiprocessing as mp
+if mp.get_start_method(allow_none=True) != 'spawn':
+    mp.set_start_method('spawn')
+
 import argparse
 import os
 import time
@@ -6,15 +10,14 @@ import torch
 import torch.nn as nn
 import torch.nn.parallel
 import torch.backends.cudnn as cudnn
-import torch.distributed as dist
 import torch.optim
 import torch.utils.data
 import torch.utils.data.distributed
 import torchvision.transforms as transforms
-# import torchvision.datasets as datasets
+
 import models
 from datasets import FileListDataset
-from utils import AverageMeter, accuracy, save_ckpt
+from utils import AverageMeter, accuracy, save_ckpt, init_processes
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -36,7 +39,7 @@ parser.add_argument('--epochs', default=30, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
-parser.add_argument('-b', '--batch-size', default=1024, type=int,
+parser.add_argument('-b', '--batch-size', default=256, type=int,
                     metavar='M', help='mini-batch size (default: 1024)')
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float,
                     metavar='LR', help='initial learning rate')
@@ -54,21 +57,27 @@ parser.add_argument('--feature-dim', default=256, type=int,
                     metavar='D', help='feature dimension (default: 256)')
 parser.add_argument('--num-classes', default=1000, type=int,
                     metavar='N', help='number of classes (default: 1000)')
+parser.add_argument('--sample-num', default=1000, type=int,
+                    help='sampling number of classes out of all classes')
 parser.add_argument('--print-freq', '-p', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
-parser.add_argument('--ckpt-path', default='checkpoints/ckpt', type=str,
+parser.add_argument('--save-path', default='checkpoints/ckpt', type=str,
                     help='path to store checkpoint (default: checkpoints)')
 parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                     help='evaluate model on validation set')
 parser.add_argument('--pretrained', dest='pretrained', action='store_true',
                     help='use pre-trained model')
-parser.add_argument('--world-size', default=1, type=int,
-                    help='number of distributed processes')
-parser.add_argument('--dist-url', default='tcp://224.66.41.62:23456', type=str,
-                    help='url used to set up distributed training')
-parser.add_argument('--dist-backend', default='gloo', type=str,
+parser.add_argument('--sampled', dest='sampled', action='store_true',
+                    help='sampling from full softmax')
+parser.add_argument('--distributed', dest='distributed', action='store_true',
+                    help='distributed training')
+parser.add_argument('--dist-addr', default='127.0.0.1', type=str,
+                    help='distributed address')
+parser.add_argument('--dist-port', default='23456', type=str,
+                    help='distributed port')
+parser.add_argument('--dist-backend', default='nccl', type=str,
                     help='distributed backend')
 
 best_prec1 = 0
@@ -78,11 +87,15 @@ def main():
     global args, best_prec1
     args = parser.parse_args()
 
-    args.distributed = args.world_size > 1
+    gpu_num = torch.cuda.device_count()
 
     if args.distributed:
-        dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
-                                world_size=args.world_size)
+        print('start init')
+        args.rank, args.size = init_processes(args.dist_addr, args.dist_port, gpu_num, args.dist_backend)
+        print("=> using {} GPUS for training".format(args.size))
+    else:
+        args.rank = 0
+        print("=> using {} GPUS for training".format(gpu_num))
 
     # create model
     if args.pretrained:
@@ -92,7 +105,11 @@ def main():
         print("=> creating model '{}'".format(args.arch))
         model = models.__dict__[args.arch](feature_dim=args.feature_dim)
 
-    model = models.Classifier(model, args.feature_dim, args.num_classes)
+    if args.sampled:
+        assert args.sample_num <= args.num_classes
+        model = models.HFClassifier(model, args.rank, args.feature_dim, args.sample_num, args.num_classes)
+    else:
+        model = models.Classifier(model, args.feature_dim, args.num_classes)
 
     if not args.distributed:
         if args.arch.startswith('alexnet') or args.arch.startswith('vgg'):
@@ -102,7 +119,8 @@ def main():
             model = torch.nn.DataParallel(model).cuda()
     else:
         model.cuda()
-        model = torch.nn.parallel.DistributedDataParallel(model)
+        model = torch.nn.parallel.DistributedDataParallel(model, [args.rank])
+        print('create DistributedDataParallel model successfully', args.rank)
 
     # define loss function (criterion) and optimizer
     criterion = nn.CrossEntropyLoss().cuda()
@@ -161,7 +179,7 @@ def main():
         num_workers=args.workers, pin_memory=True)
 
     if args.evaluate:
-        validate(val_loader, model, criterion)
+        validate(val_loader, model, criterion, args.sampled)
         return
 
     assert max(args.lr_steps) < args.epochs
@@ -170,28 +188,27 @@ def main():
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             train_sampler.set_epoch(epoch)
-        # adjust_learning_rate(optimizer, epoch)
 
         # train for one epoch
-        train(train_loader, model, criterion, optimizer, epoch)
+        train(train_loader, model, criterion, optimizer, epoch, args.sampled)
 
         # evaluate on validation set
-        prec1 = validate(val_loader, model, criterion)
+        prec1 = validate(val_loader, model, criterion, args.sampled)
 
         # remember best prec@1 and save checkpoint
-        is_best = prec1 > best_prec1
-        best_prec1 = max(prec1, best_prec1)
-        # save_checkpoint({
-        save_ckpt({
-            'epoch': epoch + 1,
-            'arch': args.arch,
-            'state_dict': model.state_dict(),
-            'best_prec1': best_prec1,
-            'optimizer' : optimizer.state_dict(),
-        }, args.ckpt_path, epoch + 1, is_best)
+        if args.rank == 0:
+            is_best = prec1 > best_prec1
+            best_prec1 = max(prec1, best_prec1)
+            save_ckpt({
+                'epoch': epoch + 1,
+                'arch': args.arch,
+                'state_dict': model.state_dict(),
+                'best_prec1': best_prec1,
+                'optimizer' : optimizer.state_dict(),
+            }, args.save_path, epoch + 1, is_best)
 
 
-def train(train_loader, model, criterion, optimizer, epoch):
+def train(train_loader, model, criterion, optimizer, epoch, sampled=None):
     batch_time = AverageMeter(10)
     data_time = AverageMeter(10)
     losses = AverageMeter(10)
@@ -208,7 +225,10 @@ def train(train_loader, model, criterion, optimizer, epoch):
         target = target.cuda(non_blocking=True)
 
         # compute output
-        output = model(input)
+        if not sampled:
+            output = model(input)
+        else:
+            output, target = model(input, target)
         loss = criterion(output, target)
 
         # measure accuracy and record loss
@@ -225,7 +245,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
         batch_time.update(time.time() - end)
         end = time.time()
 
-        if i % args.print_freq == 0:
+        if i % args.print_freq == 0 and args.rank == 0:
             print('Epoch: [{0}][{1}/{2}]\t'
                   'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                   'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
@@ -235,7 +255,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
                    data_time=data_time, loss=losses, top1=top1))
 
 
-def validate(val_loader, model, criterion):
+def validate(val_loader, model, criterion, sampled=None):
     batch_time = AverageMeter(10)
     losses = AverageMeter(10)
     top1 = AverageMeter(10)
@@ -247,7 +267,10 @@ def validate(val_loader, model, criterion):
         for i, (input, target) in enumerate(val_loader):
             target = target.cuda(non_blocking=True)
 
-            output = model(input)
+            if not sampled:
+                output = model(input)
+            else:
+                output, target = model(input, target)
             loss = criterion(output, target)
 
             prec1, = accuracy(output, target, topk=(1,))
@@ -257,7 +280,7 @@ def validate(val_loader, model, criterion):
             batch_time.update(time.time() - end)
             end = time.time()
 
-            if i % args.print_freq == 0:
+            if i % args.print_freq == 0 and args.rank == 0:
                 print('Test: [{0}/{1}]\t'
                       'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
