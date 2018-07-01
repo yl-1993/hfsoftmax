@@ -22,8 +22,6 @@ def init_processes(addr, port, gpu_num, backend):
     os.environ['WORLD_SIZE'] = str(size)
     os.environ['RANK'] = str(rank)
     dist.init_process_group(backend)
-    # dist.init_process_group(backend, rank=rank, world_size=size)
-    # torch.cuda.set_device(0)
     print('initialize {} successfully (rank {})'.format(backend, rank))
     return rank, size
 
