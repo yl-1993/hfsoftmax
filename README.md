@@ -1,6 +1,6 @@
 # Accelerated Training for Massive Classification via Dynamic Class Selection (HF-Softmax) [![pdf](https://img.shields.io/badge/Arxiv-pdf-orange.svg?style=flat)](https://arxiv.org/abs/1801.01687)
 
-# Training
+## Training
 1. Install [PyTorch](http://pytorch.org/). (Better to install the latest master from source)
 2. Follow the instruction of [InsightFace](https://github.com/deepinsight/insightface) and download training data.
 3. Decode the data(`.rec`) to images and generate training/validation list.
@@ -21,7 +21,7 @@ sh scripts/train.sh dataset_path
 sh scripts/train_hf.sh dataset_path
 ```
 
-# Distributed Training
+## Distributed Training
 For distributed training, there are one process on each GPU.
 
 Some [backends](https://pytorch.org/docs/stable/distributed.html) are provided for PyTroch Distributed training.
@@ -42,16 +42,16 @@ python setup.py clean install
 
 In our case, we use `libnccl2=2.2.13-1+cuda9.0 libnccl-dev=2.2.13-1+cuda9.0` and the master of PyTorch `0.5.0a0+e31ab99`
 
-# Hashing Forest
+## Hashing Forest
 We use [Annoy](https://github.com/spotify/annoy) to approximate the hashing forest.
 You can adjust `sample_num`, `ntrees` and `interval` to balance performance and cost.
 
-# Parameter Sever
+## Parameter Sever
 Parameter server is decoupled with PyTorch. A client is developed to communicate with the server.
 Other platforms can integrate the parameter server via the communication API .
 Currently, it only supports syncronized SGD updater.
 
-# Evaluation
+## Evaluation
 
 ```bash
 ./scripts/eval.sh xxx.pth.tar dataset_path outputs
@@ -63,7 +63,7 @@ The features will subsequently be used to perform the verification test.
 Note that the bin file from InsightFace, `lfw.bin` for example, is pickled by Python2. It cannot be processed by Python 3.0+.
 You can either use Python2 for evaluation or re-pickle the bin file by Python3 first.
 
-# Citation
+## Citation
 Please cite the following paper if you use this repository in your reseach.
 
 ```
