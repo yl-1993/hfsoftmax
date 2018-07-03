@@ -5,15 +5,21 @@
 2. Follow the instruction of [InsightFace](https://github.com/deepinsight/insightface) and download training data.
 3. Decode the data(`.rec`) to images and generate training/validation list.
 
-`python tools/rec2img.py --in-folder xxx --out-folder yyy`
+```bash
+python tools/rec2img.py --in-folder xxx --out-folder yyy
+```
 
 4. Try normal training. It uses `torch.nn.DataParallel`(multi-thread) for parallel.
 
-`sh scripts/train.sh dataset_path`
+```bash
+sh scripts/train.sh dataset_path
+```
 
 5. Try sampled training. It uses one GPU for training and default sampling number is `1000`.
 
-`sh scripts/train_hf.sh dataset_path`
+```bash
+sh scripts/train_hf.sh dataset_path
+```
 
 # Distributed Training
 For distributed training, there are one process on each GPU.
@@ -24,11 +30,15 @@ please follow the [instructions](https://docs.nvidia.com/deeplearning/sdk/nccl-i
 
 You can test your distributed setting by executing
 
-`sh scripts/test_distributed.sh`
+```bash
+sh scripts/test_distributed.sh
+```
 
 When `NCCL2` is installed, you should re-compile PyTorch from source.
 
-`python setup.py clean install`
+```bash
+python setup.py clean install
+```
 
 In our case, we use `libnccl2=2.2.13-1+cuda9.0 libnccl-dev=2.2.13-1+cuda9.0` and the master of PyTorch `0.5.0a0+e31ab99`
 
@@ -42,7 +52,10 @@ Other platforms can integrate the parameter server via the communication API .
 Currently, it only supports syncronized SGD updater.
 
 # Evaluation
-`./scripts/eval.sh xxx.pth.tar dataset_path outputs`
+
+```bash
+./scripts/eval.sh xxx.pth.tar dataset_path outputs
+```
 
 It uses `torch.nn.DataParallel` to extract features and saves it as `.npy`.
 The features will subsequently be used to perform the verification test.
