@@ -110,10 +110,10 @@ class ParameterWorker(threading.Thread):
         print('waiting for message ... ')
         packet = self._socket.recv_multipart()
         if len(packet) == 2:
-            ident, msg = tmp
+            ident, msg = packet
             msg = self._parse_json(msg)
         elif len(packet) == 4:
-            ident, msg, meta, data = tmp
+            ident, msg, meta, data = packet
             msg, meta = map(self._parse_json, [msg, meta])
             data = np.frombuffer(data, dtype=meta['dtype'])
             data = data.reshape(meta['shape'])
