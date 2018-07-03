@@ -56,21 +56,22 @@ class ParameterClient():
         )
         self._socket.send_json(msg)
 
-    def set_matrix(self, mid, data):
+    def set_matrix(self, mid, data, force=False):
         msg = dict(
             op='set_matrix',
-            mid=mid
+            mid=mid,
+            force=force
         )
-        self._socket.send_json(msg, zmq.NOBLOCK)
+        self._socket.send_json(msg, zmq.SNDMORE)
         self._send_array(data)
 
     def get_value_by_rows(self, mid, rows):
         msg = dict(
             op='get_value_by_rows',
-            mid=mid,
-            rows=rows
+            mid=mid
         )
-        self._socket.send_json(msg)
+        self._socket.send_json(msg, zmq.SNDMORE)
+        self._send_array(rows)
         # receive data
         meta = None
         while True:
@@ -87,9 +88,9 @@ class ParameterClient():
         msg = dict(
             op='set_value_by_rows',
             mid=mid,
-            rows=rows
         )
-        self._socket.send_json(msg, zmq.NOBLOCK)
+        self._socket.send_json(msg, zmq.SNDMORE)
+        self._send_array(rows, zmq.SNDMORE)
         self._send_array(data)
 
     def update_params(self, dic):
@@ -100,13 +101,14 @@ class ParameterClient():
         msg.update(dic)
         self._socket.send_json(msg)
 
-    def update_by_rows(self, mid, rows, data):
+    def update_by_rows(self, mid, rows, data, skip_decay=False):
         msg = dict(
             op='update_by_rows',
             mid=mid,
-            rows=rows
+            skip_decay=skip_decay
         )
         self._socket.send_json(msg, zmq.SNDMORE)
+        self._send_array(rows, zmq.SNDMORE)
         self._send_array(data)
 
     def snapshot(self, path):

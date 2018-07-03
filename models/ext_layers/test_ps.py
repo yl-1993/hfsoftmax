@@ -26,8 +26,8 @@ def test_sgd(bs, cls, fdim, midw, lr, weight_decay, momentum):
                 'lr': lr,
                 'weight_decay': weight_decay,
                 'momentum': momentum})
-    client.set_matrix(midw, logits.weight.data.numpy())
-    rows = [x for x in range(cls)]
+    client.set_matrix(midw, logits.weight.data.numpy(), force=True)
+    rows = np.arange(cls)
 
     for i in range(10):
         ps_weight = client.get_value_by_rows(midw, rows)
@@ -48,8 +48,8 @@ def test_sgd(bs, cls, fdim, midw, lr, weight_decay, momentum):
         optimizer.step()
 
         # parameter server sgd update
-        # ignore=True since the grad has already been regularized
-        client.update_by_rows(midw, rows, logits.weight.grad.numpy(), ignore=True)
+        # skip_decay=True since the grad has already been regularized
+        client.update_by_rows(midw, rows, logits.weight.grad.numpy(), skip_decay=True)
 
 
 if __name__ == '__main__':

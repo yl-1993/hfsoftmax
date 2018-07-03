@@ -15,7 +15,7 @@ class HFSamplerFunc(Function):
 
     def __init__(self, client, anns,
                 fdim, sample_num, num_output,
-                n_nbr=10, is_prob=False, bias=False,
+                is_prob=False, bias=False,
                 midw='0', midb='1'):
         self.fdim = fdim
         self.num_output = num_output
@@ -23,18 +23,17 @@ class HFSamplerFunc(Function):
         self.is_prob = is_prob
         self.client = client
         self.anns = anns
-        self.n_nbr = n_nbr
         self.midw = midw
         self.bias = bias
 
     def forward(self, features, labels):
         labels = labels.cpu().numpy()
-        labels = [lb.item() for lb in labels]
+        self.n_nbr = int(self.sample_num / labels.size + 1)
         self.rows, labels = self._annoy_share_mask(features, labels,
                                             self.sample_num, self.num_output)
         weights = self.client.get_value_by_rows(self.midw, self.rows)
         if not self.bias:
-            bias = np.zeros([self.sample_num], dtype=np.float32) # or change the return vars from 3 to 2
+            bias = np.zeros([self.sample_num], dtype=np.float32)
         else:
             bias = self.client.get_value_by_rows(self.midb, self.rows)
 
@@ -90,16 +89,15 @@ class HFSamplerFunc(Function):
             neg_lbs = self._annoy(feat)
         else:
             neg_lbs = self._annoy_prob(feat, sample_num)
-        lbs = set(lbs)
-        neg_lbs = list(set(neg_lbs).difference(lbs))
+        neg_lbs = list(set(neg_lbs).difference(set(lbs)))
         rnum = sample_num - lbs_size
         if len(neg_lbs) > rnum:
             random.shuffle(neg_lbs)
             neg_lbs = neg_lbs[:rnum]
         else:
-            rneg = set(range(num_output)).difference(set(neg_lbs)|lbs)
+            rneg = set(range(num_output)).difference(set(neg_lbs)|set(lbs))
             neg_lbs += random.sample(list(rneg), rnum - len(neg_lbs))
-        selected_cls = list(lbs) + list(neg_lbs)
+        selected_cls = np.append(np.array(lbs), np.array(neg_lbs))
         assert len(selected_cls) == sample_num, \
                 "unmask size vs sample num ({} vs {})".format(len(selected_cls), sample_num)
 
@@ -141,6 +139,7 @@ class HFSampler(Module):
         self.fdim = fdim
         self.sample_num = sample_num
         self.num_output = num_output
+        self.full_cls = np.arange(self.num_output)
         # init param client
         self.client = ParameterClient(rank)
         self.midw = midw
@@ -166,24 +165,17 @@ class HFSampler(Module):
         if not self.iter % self.interval == 0 and \
             not self.iter == self.start_iter:
             return
-        full_cls = [x for x in range(self.num_output)]
-        t1 = time.time()
-        w = self.client.get_value_by_rows(self.midw, full_cls)
-        t2 = time.time()
-        print('get matrix {} s'.format(t2 - t1))
+        w = self.client.get_value_by_rows(self.midw, self.full_cls)
         self.anns = AnnoyIndex(self.fdim)
         for i, v in enumerate(w):
             self.anns.add_item(i, v)
-        t3 = time.time()
         self.anns.build(self.ntrees)
-        t4 = time.time()
-        print('build trees: add item({} s), build({} s)'.format(t3 - t2, t4 - t3))
 
     def forward(self, features, labels):
         if self.training:
             self._update_hf()
             self.iter += 1
-            return HFSamplerFunc(self.client, self.anns, 
-                        self.fdim, self.sample_num, self.num_output)(features, labels)
+            return HFSamplerFunc(self.client, self.anns, self.fdim,
+                    self.sample_num, self.num_output)(features, labels)
         else:
             return FetchWeightFunc(self.client, self.num_output)(features, labels)

@@ -96,6 +96,11 @@ class ParameterWorker(threading.Thread):
     def _parse_json(x):
         return json.loads(x.decode('utf-8'))
 
+    @staticmethod
+    def _buf_to_ndarray(x, md):
+        x = np.frombuffer(x, dtype=md['dtype'])
+        return x.reshape(md['shape'])
+
     def _ready_for_update(self, mid):
         # TODO: following neglect the situation that a client sends the request twice
         for k in self.clients:
@@ -115,9 +120,15 @@ class ParameterWorker(threading.Thread):
         elif len(packet) == 4:
             ident, msg, meta, data = packet
             msg, meta = map(self._parse_json, [msg, meta])
-            data = np.frombuffer(data, dtype=meta['dtype'])
-            data = data.reshape(meta['shape'])
-            msg['data'] = data
+            if msg['op'] == 'set_matrix':
+                msg['data'] = self._buf_to_ndarray(data, meta)
+            else:
+                msg['rows'] = self._buf_to_ndarray(data, meta)
+        elif len(packet) == 6:
+            ident, msg, rows_meta, rows_data, val_meta, val_data = packet
+            msg, rows_meta, val_meta = map(self._parse_json, [msg, rows_meta, val_meta])
+            msg['rows'] = self._buf_to_ndarray(rows_data, rows_meta)
+            msg['data'] = self._buf_to_ndarray(val_data, val_meta)
         else:
             raise RuntimeError('Unsupported msg type')
         self.handle(ident, msg)
@@ -161,7 +172,10 @@ class ParameterWorker(threading.Thread):
             self._reset_grad(mid)
         elif op == 'set_matrix':
             assert 'data' in msg
-            self.set_matrix(msg['mid'], msg['data'])
+            force = False
+            if 'force' in msg and msg['force']:
+                force= True
+            self.set_matrix(msg['mid'], msg['data'], force)
             print('the value of matrix {} has been set.'.format(msg['mid']))
         elif op == 'get_value_by_rows':
             weights = self.get_value_by_rows(msg['mid'], msg['rows'])
@@ -186,9 +200,15 @@ class ParameterWorker(threading.Thread):
                     self.grads[mid][r] += np.array(msg['data'][i])
             if self._ready_for_update(mid):
                 print('updating')
+                skip_decay = False
+                if len(self.clients) == 1 and \
+                    'skip_decay' in msg and msg['skip_decay']:
+                    print('skipping weight decay')
+                    skip_decay = True
                 self.update_by_rows(mid,
                                     np.array(list(self.grads[mid].keys())),
-                                    np.array(list(self.grads[mid].values())))
+                                    np.array(list(self.grads[mid].values())),
+                                    skip_decay=skip_decay)
                 print("weight change", self.mtable[mid][self.wkey].mean())
                 # reset gradient
                 self._reset_grad(mid)
@@ -247,14 +267,14 @@ class ParameterWorker(threading.Thread):
         if self.hkey in self.mtable[mid]:
             self.mtable[mid][self.hkey][rows, :].fill(0)
 
-    def update_by_rows(self, mid, rows, grad, ignore=False):
+    def update_by_rows(self, mid, rows, grad, skip_decay=False):
         """ Note that the gradient from PyTorch is already conducted L2 regularization!
             That is, $grad += weight * weight\_decay$ has been applied to the grad.
             If you use `param.grad` from PyTorch Parameter, you don't have to regularize
             weights again.
         """
         if self.optim.weight_decay > 0:
-            if not ignore:
+            if not skip_decay:
                 grad = self._l2_regularize(self.mtable[mid][self.wkey][rows, :], grad)
             pass
         self._sgd_update(mid, rows, grad)
@@ -307,7 +327,7 @@ class ParameterWorker(threading.Thread):
         elif isinstance(mid, int):
             mid = str(mid)
         elif isinstance(mid, unicode):
-            mid = mid.encode('ascii','ignore')
+            mid = mid.encode('ascii', 'ignore')
         else:
             raise TypeError('The key({},{}) for Parameter Server should be str!'.format(mid, type(mid)))
         if not self._exists(mid):
