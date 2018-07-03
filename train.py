@@ -222,7 +222,8 @@ def train(train_loader, model, criterion, optimizer, epoch, sampled=None):
         # measure data loading time
         data_time.update(time.time() - end)
 
-        target = target.cuda(non_blocking=True)
+        # target = target.cuda(non_blocking=True)
+        target = target.cuda()
 
         # compute output
         if not sampled:
