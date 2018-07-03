@@ -26,77 +26,38 @@ class HFSamplerFunc(Function):
         self.n_nbr = n_nbr
         self.midw = midw
         self.bias = bias
-        # print('HFSampler start from: {}'.format(self.start_iter))
 
     def forward(self, features, labels):
-        t0 = time.time()
-        # features = features.detach()
-        # labels = labels.detach()
-        t1 = time.time()
-        # print(features.size(), labels.size())
-
-        # full_cls = [x for x in range(self.num_output)]
-        # self.rows = full_cls
-        # weights = self.client.get_value_by_rows(self.midw, full_cls)
-        # bias = np.zeros([self.num_output], dtype=np.float32)
-        # return torch.from_numpy(weights).cuda(), \
-        #     torch.from_numpy(bias).cuda(), \
-        #     labels
-
-        t2 = time.time()
         labels = labels.cpu().numpy()
-        # print(labels.type())
-        t21 = time.time()
-        # labels = [lb.item() for lb in labels.cpu().numpy()]
         labels = [lb.item() for lb in labels]
-        # print(type(labels))
-        t3 = time.time()
         self.rows, labels = self._annoy_share_mask(features, labels,
                                             self.sample_num, self.num_output)
-        # print(type(self.rows[0]), type(labels))
-        t4 = time.time()
         weights = self.client.get_value_by_rows(self.midw, self.rows)
         if not self.bias:
             bias = np.zeros([self.sample_num], dtype=np.float32) # or change the return vars from 3 to 2
         else:
             bias = self.client.get_value_by_rows(self.midb, self.rows)
-        t5 = time.time()
-        # print('detach({:.4f} s), zero({:.4f} s), lb({:.4f} s), mask({:.4f} s), weight({:.4f} s), 2cpu({:.4f} s), tot({:.4f} s)'.format(t1-t0, t2-t1, t3-t21, t4-t3, t5-t4, t21-t2, t5-t0))
 
         return torch.from_numpy(weights).cuda(), \
             torch.from_numpy(bias).cuda(), \
             torch.from_numpy(labels).cuda()
 
     def backward(self, grad_w, grad_b, grad_l):
-        ''' update return immediately
-        '''
-        t0 = time.time()
-        grad_w = grad_w.cpu().numpy()
-        # print(grad_w.shape, grad_w[:3, 0])
-        # print(np.array(self.rows).mean(), grad_w.mean())
-        # grad_w = grad_w.astype(np.float64)
-        # print(grad_w.mean())
-        # print(type(grad_w), type(grad_w[0]), type(grad_w[0][0]), type(grad_w.tolist()[0][0]))
-        # print('[Client]', np.array(self.rows).mean(), grad_w.mean())
-        # print(np.array(grad_w.tolist()).mean())
-        t1 = time.time()
-        self.client.update_by_rows(self.midw, self.rows, grad_w)
-        # self.client.update_by_rows(self.midw, self.rows, grad_w.cpu().numpy())
+        """ update return immediately
+        """
+        self.client.update_by_rows(self.midw, self.rows, grad_w.cpu().numpy())
         if self.bias:
             self.client.update_by_rows(self.midb, self.rows, grad_b.cpu().numpy())
-        t2 = time.time()
-        # print('update by row {} s, {} s'.format(t1-t0, t2-t1))
-        # return self.grad_f, self.grad_l
         return None, None
 
 
-    ''' private functions
-    '''
+    """ private functions
+    """
     def _gen_idxs(self, labels):
         ## TODO: better doc
-        ''' idx represents the index of label in the batch
+        """ idx represents the index of label in the batch
             this function constructs the batch target label
-        '''
+        """
         lbs = set(labels)
         lbs_size = len(lbs)
         lbs = list(lbs)
@@ -125,15 +86,12 @@ class HFSamplerFunc(Function):
 
     def _annoy_share_mask(self, feat, labels, sample_num, num_output):
         idxs, lbs, lbs_size = self._gen_idxs(labels)
-        # self._update_wannoy()
         if not self.is_prob:
             neg_lbs = self._annoy(feat)
         else:
             neg_lbs = self._annoy_prob(feat, sample_num)
-        # lbs = set(labels)
         lbs = set(lbs)
         neg_lbs = list(set(neg_lbs).difference(lbs))
-        # rnum = sample_num - len(lbs)
         rnum = sample_num - lbs_size
         if len(neg_lbs) > rnum:
             random.shuffle(neg_lbs)
