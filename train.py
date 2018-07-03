@@ -106,6 +106,7 @@ def main():
         model = models.__dict__[args.arch](feature_dim=args.feature_dim)
 
     if args.sampled:
+        assert args.distributed
         assert args.sample_num <= args.num_classes
         model = models.HFClassifier(model, args.rank, args.feature_dim, args.sample_num, args.num_classes)
     else:
