@@ -61,6 +61,8 @@ Currently, it only supports syncronized SGD updater.
 It uses `torch.nn.DataParallel` to extract features and saves it as `.npy`.
 The features will subsequently be used to perform the verification test.
 
+If you use distributed training, set `strict=False` during feature extraction.
+
 Note that the bin file from InsightFace, `lfw.bin` for example, is pickled by Python2. It cannot be processed by Python 3.0+.
 You can either use Python2 for evaluation or re-pickle the bin file by Python3 first.
 
