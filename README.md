@@ -18,11 +18,12 @@ sh scripts/train.sh dataset_path
 5. Try sampled training. It uses one GPU for training and default sampling number is `1000`.
 
 ```bash
+python paramserver/paramserver.py
 sh scripts/train_hf.sh dataset_path
 ```
 
 ## Distributed Training
-For distributed training, there are one process on each GPU.
+For distributed training, there is one process on each GPU.
 
 Some [backends](https://pytorch.org/docs/stable/distributed.html) are provided for PyTroch Distributed training.
 If you want to use `nccl` as backend for distributed training,
@@ -48,7 +49,7 @@ You can adjust `sample_num`, `ntrees` and `interval` to balance performance and 
 
 ## Parameter Sever
 Parameter server is decoupled with PyTorch. A client is developed to communicate with the server.
-Other platforms can integrate the parameter server via the communication API .
+Other platforms can integrate the parameter server via the communication API.
 Currently, it only supports syncronized SGD updater.
 
 ## Evaluation
