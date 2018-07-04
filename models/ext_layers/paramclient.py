@@ -120,14 +120,14 @@ class ParameterClient():
 
     def load(self, path):
         msg = dict(
-            op='snapshot',
+            op='resume',
             path=path
         )
         self._socket.send_json(msg)
 
     def resume(self, path):
         msg = dict(
-            op='snapshot',
+            op='resume',
             path=path
         )
         self._socket.send_json(msg)

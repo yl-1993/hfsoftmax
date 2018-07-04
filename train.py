@@ -18,6 +18,7 @@ import torchvision.transforms as transforms
 import models
 from datasets import FileListDataset
 from utils import AverageMeter, accuracy, save_ckpt, init_processes
+from models import ParameterClient
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -79,6 +80,8 @@ parser.add_argument('--dist-port', default='23456', type=str,
                     help='distributed port')
 parser.add_argument('--dist-backend', default='nccl', type=str,
                     help='distributed backend')
+parser.add_argument('--tmp-client-id', default=9999, type=int,
+                    help='tmp client used to communicate with paramserver')
 
 best_prec1 = 0
 
@@ -90,9 +93,8 @@ def main():
     gpu_num = torch.cuda.device_count()
 
     if args.distributed:
-        print('start init')
         args.rank, args.size = init_processes(args.dist_addr, args.dist_port, gpu_num, args.dist_backend)
-        print("=> using {} GPUS for training".format(args.size))
+        print("=> using {} GPUS for distributed training".format(args.size))
     else:
         args.rank = 0
         print("=> using {} GPUS for training".format(gpu_num))
@@ -106,7 +108,8 @@ def main():
         model = models.__dict__[args.arch](feature_dim=args.feature_dim)
 
     if args.sampled:
-        assert args.distributed
+        if args.rank > 0:
+            assert args.distributed
         assert args.sample_num <= args.num_classes
         model = models.HFClassifier(model, args.rank, args.feature_dim, args.sample_num, args.num_classes)
     else:
@@ -141,6 +144,14 @@ def main():
             optimizer.load_state_dict(checkpoint['optimizer'])
             print("=> loaded checkpoint '{}' (epoch {})"
                   .format(args.resume, checkpoint['epoch']))
+            if args.sampled:
+                with ParameterClient(args.tmp_client_id) as client:
+                    cls_resume = args.resume.replace('.pth.tar', '_cls.h5')
+                    if os.path.isfile(cls_resume):
+                        client.resume(cls_resume)
+                        print("=> loaded checkpoint '{}' (epoch {})".format(cls_resume, checkpoint['epoch']))
+                    else:
+                        print("=> no checkpoint found at '{}'".format(cls_resume))
         else:
             print("=> no checkpoint found at '{}'".format(args.resume))
 
@@ -207,6 +218,9 @@ def main():
                 'best_prec1': best_prec1,
                 'optimizer' : optimizer.state_dict(),
             }, args.save_path, epoch + 1, is_best)
+            if args.sampled:
+                with ParameterClient(args.tmp_client_id) as client:
+                    client.snapshot('{}_epoch_{}_cls.h5'.format(args.save_path, epoch + 1))
 
 
 def train(train_loader, model, criterion, optimizer, epoch, sampled=None):

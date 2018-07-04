@@ -104,31 +104,6 @@ class HFSamplerFunc(Function):
         return selected_cls, idxs
 
 
-class FetchWeightFunc(Function):
-
-    def __init__(self, client, num_output, bias=False,
-                midw='0', midb='1'):
-        self.num_output = num_output
-        self.client = client
-        self.midw = midw
-        self.midb = midb
-        self.bias = bias
-
-    def forward(self, features, labels):
-        full_cls = [x for x in range(self.num_output)]
-        weights = self.client.get_value_by_rows(self.midw, full_cls)
-        if not self.bias:
-            bias = np.zeros([self.num_output], dtype=np.float32)
-        else:
-            bias = self.client.get_value_by_rows(self.midb, full_cls)
-        return torch.from_numpy(weights).cuda(), \
-            torch.from_numpy(bias).cuda(), \
-            labels
-
-    def backward(self, grad_w, grad_b, grad_l):
-        return None, None
-
-
 class HFSampler(Module):
 
     def __init__(self, rank, fdim, sample_num, num_output, bias=False,
@@ -144,15 +119,16 @@ class HFSampler(Module):
         self.client = ParameterClient(rank)
         self.midw = midw
         self.midb = midb
-        self.bias = bias
+        self.is_bias = bias
         self.client.add_matrix(self.midw, [self.num_output, self.fdim])
-        if self.bias:
+        if self.is_bias:
             self.client.add_matrix(self.midb, [self.num_output, 1])
         # init hashing forest
         self.ntrees = ntrees
         self.interval = interval
         self.start_iter = start_iter
         self.iter = start_iter
+        self.test_iter = start_iter
         self.anns = AnnoyIndex(self.fdim)
 
     def __repr__(self):
@@ -176,6 +152,15 @@ class HFSampler(Module):
             self._update_hf()
             self.iter += 1
             return HFSamplerFunc(self.client, self.anns, self.fdim,
-                    self.sample_num, self.num_output)(features, labels)
+                    self.sample_num, self.num_output, bias=self.is_bias)(features, labels)
         else:
-            return FetchWeightFunc(self.client, self.num_output)(features, labels)
+            if self.iter > self.test_iter:
+                self.test_iter = self.iter
+                self.weights = self.client.get_value_by_rows(self.midw, self.full_cls)
+                if not self.is_bias:
+                    self.bias = np.zeros([self.num_output], dtype=np.float32)
+                else:
+                    self.bias = self.client.get_value_by_rows(self.midb, self.full_cls)
+            return torch.from_numpy(self.weights).cuda(), \
+                   torch.from_numpy(self.bias).cuda(), \
+                   labels
