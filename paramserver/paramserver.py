@@ -296,6 +296,7 @@ class ParameterWorker(threading.Thread):
 
     def snapshot(self, path):
         with h5py.File(path, 'w') as f:
+            print('snapshot to {}'.format(path))
             ps = f.create_group(self.key)
             for key in self.mtable:
                 midg = ps.create_group(str(key))
@@ -304,6 +305,7 @@ class ParameterWorker(threading.Thread):
 
     def resume(self, path, his=True):
         with h5py.File(path, 'r') as f:
+            print('resume from {} with history={}'.format(path, his))
             if self.key not in f.keys():
                 logging.warn('The model does not have {}'.format(self.key))
                 return 
