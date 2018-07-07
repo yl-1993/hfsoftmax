@@ -295,7 +295,7 @@ class ParameterWorker(threading.Thread):
                 print("{} has been updated to {}".format(key, val))
 
     def snapshot(self, path):
-        with h5py.File(path, 'a') as f:
+        with h5py.File(path, 'w') as f:
             ps = f.create_group(self.key)
             for key in self.mtable:
                 midg = ps.create_group(str(key))
