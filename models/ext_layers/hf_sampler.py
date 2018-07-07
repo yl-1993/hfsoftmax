@@ -9,6 +9,7 @@ from torch.autograd import Function
 from torch.nn.modules.module import Module
 from annoy import AnnoyIndex
 from .paramclient import ParameterClient
+from multiprocessing.dummy import Pool
 
 
 class HFSamplerFunc(Function):
@@ -67,10 +68,22 @@ class HFSamplerFunc(Function):
     def _norm(self, lst):
         return lst*1.0 / lst.sum()
 
+    def _get_nns_by_vector(self, v):
+        return self.anns.get_nns_by_vector(v, self.n_nbr)
+
+    def _annoy_thread(self, x):
+        # since python is limited by GIL, more processes may lower the speed
+        pool = Pool(processes=2)
+        res = pool.map_async(self._get_nns_by_vector, x)
+        res.wait()
+        if res.ready() and res.successful():
+            nbrs = [nbr for nbrs in res.get() for nbr in nbrs]
+            return nbrs
+
     def _annoy(self, x):
         nbrs = []
         for v in x:
-            nbrs.extend(self.anns.get_nns_by_vector(v, self.n_nbr))
+            nbrs.extend(self._get_nns_by_vector(v))
         return nbrs
 
     def _annoy_prob(self, x, sample_num):
@@ -86,7 +99,7 @@ class HFSamplerFunc(Function):
     def _annoy_share_mask(self, feat, labels, sample_num, num_output):
         idxs, lbs, lbs_size = self._gen_idxs(labels)
         if not self.is_prob:
-            neg_lbs = self._annoy(feat)
+            neg_lbs = self._annoy_thread(feat)
         else:
             neg_lbs = self._annoy_prob(feat, sample_num)
         neg_lbs = list(set(neg_lbs).difference(set(lbs)))
