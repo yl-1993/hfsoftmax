@@ -14,7 +14,7 @@ from multiprocessing.dummy import Pool
 
 class HFSamplerFunc(Function):
 
-    def __init__(self, client, anns,
+    def __init__(self, client, anns, pool,
                 fdim, sample_num, num_output,
                 is_prob=False, bias=False,
                 midw='0', midb='1'):
@@ -24,6 +24,7 @@ class HFSamplerFunc(Function):
         self.is_prob = is_prob
         self.client = client
         self.anns = anns
+        self.pool = pool
         self.midw = midw
         self.bias = bias
 
@@ -73,8 +74,7 @@ class HFSamplerFunc(Function):
 
     def _annoy_thread(self, x):
         # since python is limited by GIL, more processes may lower the speed
-        pool = Pool(processes=2)
-        res = pool.map_async(self._get_nns_by_vector, x)
+        res = self.pool.map_async(self._get_nns_by_vector, x)
         res.wait()
         if res.ready() and res.successful():
             nbrs = [nbr for nbrs in res.get() for nbr in nbrs]
@@ -143,6 +143,7 @@ class HFSampler(Module):
         self.iter = start_iter
         self.test_iter = start_iter
         self.anns = AnnoyIndex(self.fdim)
+        self.pool = Pool(processes=2)
 
     def __repr__(self):
         return ('{name}({rank}, fdim={fdim}, sample_num={sample_num},'
@@ -164,7 +165,7 @@ class HFSampler(Module):
         if self.training:
             self._update_hf()
             self.iter += 1
-            return HFSamplerFunc(self.client, self.anns, self.fdim,
+            return HFSamplerFunc(self.client, self.anns, self.pool, self.fdim,
                     self.sample_num, self.num_output, bias=self.is_bias)(features, labels)
         else:
             if self.iter > self.test_iter:
