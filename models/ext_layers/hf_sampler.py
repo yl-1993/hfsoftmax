@@ -100,6 +100,9 @@ class HFSamplerFunc(Function):
         idxs, lbs, lbs_size = self._gen_idxs(labels)
         if not self.is_prob:
             neg_lbs = self._annoy_thread(feat)
+            # the output of multi-thread and single-thread should be equal,
+            # you can verify by uncommenting below centence
+            # assert neg_lbs == self._annoy(feat)
         else:
             neg_lbs = self._annoy_prob(feat, sample_num)
         neg_lbs = list(set(neg_lbs).difference(set(lbs)))
