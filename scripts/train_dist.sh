@@ -8,6 +8,7 @@ num_classes=85164
 
 CUDA_VISIBLE_DEVICES=$GPU mpirun -np $num python train.py \
     --distributed \
+    --workders 0 \
     --dist-port $dist_port \
     --num-classes $num_classes \
     --train-filelist $dataset_path/train_list.txt \

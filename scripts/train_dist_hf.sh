@@ -11,6 +11,7 @@ save_path='checkpoints/hfsampler_dist'
 
 CUDA_VISIBLE_DEVICES=$GPU mpirun -np $num python train.py \
     --distributed \
+    --workders 0 \
     --sampled \
     --sample-num $sample_num \
     --num-classes $num_classes \
