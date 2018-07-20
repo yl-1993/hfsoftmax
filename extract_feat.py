@@ -29,6 +29,7 @@ parser.add_argument('--input-size', default=112, type=int)
 parser.add_argument('--feature-dim', default=256, type=int)
 parser.add_argument('--load-path', type=str)
 parser.add_argument('--bin-file', type=str)
+parser.add_argument('--strict', dest='strict', action='store_true')
 parser.add_argument('--output-path', default='dump.npy', type=str)
 
 
@@ -55,8 +56,11 @@ def main():
     model = torch.nn.DataParallel(model).cuda()
 
     if args.load_path:
-        classifier_keys = ['module.logits.weight', 'module.logits.bias']
-        load_ckpt(args.load_path, model, ignores=classifier_keys, strict=True)
+        if args.strict:
+            classifier_keys = ['module.logits.weight', 'module.logits.bias']
+            load_ckpt(args.load_path, model, ignores=classifier_keys, strict=True)
+        else:
+            load_ckpt(args.load_path, model, strict=False)
 
     cudnn.benchmark = True
 
