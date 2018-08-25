@@ -10,6 +10,7 @@ save_path='checkpoints/hfsampler'
 CUDA_VISIBLE_DEVICES=$GPU python train.py \
     --sampled \
     --sample-num $sample_num \
+    --sampler-type 'hnsw' \
     --num-classes $num_classes \
     --save-path $save_path \
     --train-filelist $dataset_path/train_list.txt \

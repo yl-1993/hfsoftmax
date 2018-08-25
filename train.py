@@ -72,6 +72,8 @@ parser.add_argument('--pretrained', dest='pretrained', action='store_true',
                     help='use pre-trained model')
 parser.add_argument('--sampled', dest='sampled', action='store_true',
                     help='sampling from full softmax')
+parser.add_argument('--sampler-type', default='hf', type=str,
+                    help='choose different type of samplers (default: hf)')
 parser.add_argument('--distributed', dest='distributed', action='store_true',
                     help='distributed training')
 parser.add_argument('--dist-addr', default='127.0.0.1', type=str,
@@ -111,7 +113,7 @@ def main():
         if args.rank > 0:
             assert args.distributed
         assert args.sample_num <= args.num_classes
-        model = models.HFClassifier(model, args.rank, args.feature_dim, args.sample_num, args.num_classes)
+        model = models.samplerClassifier[args.sampler_type](model, args.rank, args.feature_dim, args.sample_num, args.num_classes)
     else:
         model = models.Classifier(model, args.feature_dim, args.num_classes)
 
