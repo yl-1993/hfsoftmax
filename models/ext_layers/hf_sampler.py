@@ -55,9 +55,9 @@ class HFSamplerFunc(Function):
     """ private functions
     """
     def _gen_idxs(self, labels):
-        ## TODO: better doc
-        """ idx represents the index of label in the batch
-            this function constructs the batch target label
+        """ This function constructs the `relative label` inside batch.
+            idx represents the index of label in the batch, while
+            lbs is the set of absolute label.
         """
         lbs = set(labels)
         lbs_size = len(lbs)
@@ -73,7 +73,7 @@ class HFSamplerFunc(Function):
         return self.anns.get_nns_by_vector(v, self.n_nbr)
 
     def _annoy_thread(self, x):
-        # since python is limited by GIL, more processes may lower the speed
+        # since python is limited by GIL, more threads may lower the speed
         res = self.pool.map_async(self._get_nns_by_vector, x)
         res.wait()
         if res.ready() and res.successful():
