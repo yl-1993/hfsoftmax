@@ -125,7 +125,7 @@ def pil_loader(img_str):
 def bin_loader(path):
     '''load verification img array and label from bin file
     '''
-    bins, lbs = pickle.load(open(path, 'rb'))
+    bins, lbs = pickle.load(open(path, 'rb'), encoding='bytes')
     assert len(bins) == 2*len(lbs)
     imgs = [pil_loader(b) for b in bins]
     return imgs, lbs
