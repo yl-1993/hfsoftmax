@@ -100,10 +100,10 @@ def load_ckpt(path, model, ignores=[], strict=True, optimizer=None):
             for k in model_keys - pretrained_keys:
                 print('warning: {} not loaded'.format(k))
         if optimizer != None:
-            assert len(ignore) == 0
+            assert len(ignores) == 0
             optimizer.load_state_dict(checkpoint['optimizer'])
-            print("=> loaded checkpoint '{}' (step {})".format(path, checkpoint['step']))
-            return checkpoint['step']
+            print("=> loaded checkpoint '{}' (step {})".format(path, checkpoint['epoch']))
+            return checkpoint['epoch'], checkpoint['best_prec1']
     else:
         assert False, "=> no checkpoint found at '{}'".format(path)
 

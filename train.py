@@ -17,12 +17,14 @@ import torchvision.transforms as transforms
 
 import models
 from datasets import FileListDataset
-from utils import AverageMeter, accuracy, save_ckpt, init_processes
+from utils import AverageMeter, accuracy, save_ckpt, load_ckpt, init_processes
 from models import ParameterClient
+
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
     and callable(models.__dict__[name]))
+
 
 parser = argparse.ArgumentParser(description='PyTorch Face Classification Training')
 parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet50',
@@ -34,8 +36,8 @@ parser.add_argument('--train-filelist', type=str)
 parser.add_argument('--train-prefix', type=str)
 parser.add_argument('--val-filelist', type=str)
 parser.add_argument('--val-prefix', type=str)
-parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
-                    help='number of data loading workers (default: 4)')
+parser.add_argument('-j', '--workers', default=0, type=int, metavar='N',
+                    help='number of data loading workers (default: 0)')
 parser.add_argument('--epochs', default=30, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
@@ -138,14 +140,7 @@ def main():
     # optionally resume from a checkpoint
     if args.resume:
         if os.path.isfile(args.resume):
-            print("=> loading checkpoint '{}'".format(args.resume))
-            checkpoint = torch.load(args.resume)
-            args.start_epoch = checkpoint['epoch']
-            best_prec1 = checkpoint['best_prec1']
-            model.load_state_dict(checkpoint['state_dict'])
-            optimizer.load_state_dict(checkpoint['optimizer'])
-            print("=> loaded checkpoint '{}' (epoch {})"
-                  .format(args.resume, checkpoint['epoch']))
+            args.start_epoch, best_prec1 = load_ckpt(args.resume, model, optimizer=optimizer)
             if args.sampled:
                 with ParameterClient(args.tmp_client_id) as client:
                     cls_resume = args.resume.replace('.pth.tar', '_cls.h5')
