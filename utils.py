@@ -3,6 +3,7 @@ import torch
 import torch.distributed as dist
 import os
 import io
+import sys
 import pickle
 from PIL import Image
 import multiprocessing as mp
@@ -125,7 +126,14 @@ def pil_loader(img_str):
 def bin_loader(path):
     '''load verification img array and label from bin file
     '''
-    bins, lbs = pickle.load(open(path, 'rb'), encoding='bytes')
+    with open(path, 'rb') as f:
+        if sys.version_info[0] == 2:
+            data = pickle.load(open(path, 'rb'))
+        elif sys.version_info[0] == 3:
+            data = pickle.load(open(path, 'rb'), encoding='bytes')
+        else:
+            raise EnvironmentError('Only support python 2 or 3')
+    bins, lbs = data
     assert len(bins) == 2*len(lbs)
     imgs = [pil_loader(b) for b in bins]
     return imgs, lbs
