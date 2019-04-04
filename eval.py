@@ -50,7 +50,7 @@ def main():
 
     features = normalize(features)
     _, _, acc, val, val_std, far = evaluate(features, lbs, nrof_folds=args.nfolds)
-    print("accuracy: {}({})".format(acc.mean(), acc.std()))
+    print("accuracy: {:.4f}({:.4f})".format(acc.mean(), acc.std()))
 
 
 if __name__ == '__main__':
