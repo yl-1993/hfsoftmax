@@ -55,7 +55,7 @@ Currently, it only supports syncronized SGD updater.
 ## Evaluation
 
 ```bash
-./scripts/eval.sh xxx.pth.tar dataset_path outputs
+./scripts/eval.sh arch model_path dataset_path outputs
 ```
 
 It uses `torch.nn.DataParallel` to extract features and saves it as `.npy`.
