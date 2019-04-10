@@ -42,16 +42,14 @@ parser.add_argument('--epochs', default=30, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
-parser.add_argument('-b', '--batch-size', default=256, type=int,
-                    metavar='M', help='mini-batch size (default: 1024)')
+parser.add_argument('--batch-size', default=256, type=int)
+parser.add_argument('--test-batch-size', default=None, type=int)
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float,
                     metavar='LR', help='initial learning rate')
 parser.add_argument('--lr-steps', default=[21, 27], type=list,
                     help='stpes to change lr')
-parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
-                    help='momentum')
-parser.add_argument('--weight-decay', '--wd', default=1e-4, type=float,
-                    metavar='W', help='weight decay (default: 1e-4)')
+parser.add_argument('--momentum', default=0.9, type=float)
+parser.add_argument('--weight-decay', '--wd', default=1e-4, type=float)
 parser.add_argument('--gamma', default=0.1, type=float,
                     help='learing rate multiplier')
 parser.add_argument('--input-size', default=112, type=int,
@@ -62,8 +60,8 @@ parser.add_argument('--num-classes', default=1000, type=int,
                     metavar='N', help='number of classes (default: 1000)')
 parser.add_argument('--sample-num', default=1000, type=int,
                     help='sampling number of classes out of all classes')
-parser.add_argument('--print-freq', '-p', default=10, type=int,
-                    metavar='N', help='print frequency (default: 10)')
+parser.add_argument('--print-freq', default=10, type=int,
+                    help='print frequency (default: 10)')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
 parser.add_argument('--save-path', default='checkpoints/ckpt', type=str,
@@ -175,6 +173,8 @@ def main():
         train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
         num_workers=args.workers, pin_memory=True, sampler=train_sampler)
 
+    if args.test_batch_size is None:
+        args.test_batch_size = 2 * args.batch_size
     val_loader = torch.utils.data.DataLoader(
         FileListDataset(
         args.val_filelist,
@@ -184,7 +184,7 @@ def main():
             transforms.ToTensor(),
             normalize,
         ])),
-        batch_size=args.batch_size, shuffle=False,
+        batch_size=args.test_batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=True)
 
     if args.evaluate:
