@@ -1,5 +1,9 @@
 # Accelerated Training for Massive Classification via Dynamic Class Selection (HF-Softmax) [![pdf](https://img.shields.io/badge/Arxiv-pdf-orange.svg?style=flat)](https://arxiv.org/abs/1801.01687)
 
+## Paper
+[Accelerated Training for Massive Classification via Dynamic Class Selection](https://aaai.org/ocs/index.php/AAAI/AAAI18/paper/view/17244), AAAI 2018 (**Oral**)
+
+
 ## Training
 1. Install [PyTorch](http://pytorch.org/). (Better to install the latest master from source)
 2. Follow the instruction of [InsightFace](https://github.com/deepinsight/insightface) and download training data.
