@@ -1,20 +1,20 @@
-"""Helper for evaluation on the Labeled Faces in the Wild dataset 
+"""Helper for evaluation on the Labeled Faces in the Wild dataset
 """
 
 # MIT License
-# 
+#
 # Copyright (c) 2016 David Sandberg
-# 
+#
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
 # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 # copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
-# 
+#
 # The above copyright notice and this permission notice shall be included in all
 # copies or substantial portions of the Software.
-# 
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -30,6 +30,7 @@ from __future__ import division
 from __future__ import print_function
 
 import os
+import math
 import numpy as np
 from sklearn.model_selection import KFold
 from scipy import interpolate
@@ -47,8 +48,8 @@ def distance(embeddings1, embeddings2, distance_metric=0):
         similarity = dot / norm
         dist = np.arccos(similarity) / math.pi
     else:
-        raise 'Undefined distance metric %d' % distance_metric 
-        
+        raise 'Undefined distance metric %d' % distance_metric
+
     return dist
 
 
@@ -58,20 +59,20 @@ def calculate_roc(thresholds, embeddings1, embeddings2, actual_issame, nrof_fold
     nrof_pairs = min(len(actual_issame), embeddings1.shape[0])
     nrof_thresholds = len(thresholds)
     k_fold = KFold(n_splits=nrof_folds, shuffle=False)
-    
+
     tprs = np.zeros((nrof_folds,nrof_thresholds))
     fprs = np.zeros((nrof_folds,nrof_thresholds))
     accuracy = np.zeros((nrof_folds))
-    
+
     indices = np.arange(nrof_pairs)
-    
+
     for fold_idx, (train_set, test_set) in enumerate(k_fold.split(indices)):
         if subtract_mean:
             mean = np.mean(np.concatenate([embeddings1[train_set], embeddings2[train_set]]), axis=0)
         else:
           mean = 0.0
         dist = distance(embeddings1-mean, embeddings2-mean, distance_metric)
-        
+
         # Find the best threshold for the fold
         acc_train = np.zeros((nrof_thresholds))
         for threshold_idx, threshold in enumerate(thresholds):
@@ -80,7 +81,7 @@ def calculate_roc(thresholds, embeddings1, embeddings2, actual_issame, nrof_fold
         for threshold_idx, threshold in enumerate(thresholds):
             tprs[fold_idx,threshold_idx], fprs[fold_idx,threshold_idx], _ = calculate_accuracy(threshold, dist[test_set], actual_issame[test_set])
         _, _, accuracy[fold_idx] = calculate_accuracy(thresholds[best_threshold_index], dist[test_set], actual_issame[test_set])
-          
+
         tpr = np.mean(tprs,0)
         fpr = np.mean(fprs,0)
     return tpr, fpr, accuracy
@@ -92,7 +93,7 @@ def calculate_accuracy(threshold, dist, actual_issame):
     fp = np.sum(np.logical_and(predict_issame, np.logical_not(actual_issame)))
     tn = np.sum(np.logical_and(np.logical_not(predict_issame), np.logical_not(actual_issame)))
     fn = np.sum(np.logical_and(np.logical_not(predict_issame), actual_issame))
-  
+
     tpr = 0 if (tp+fn==0) else float(tp) / float(tp+fn)
     fpr = 0 if (fp+tn==0) else float(fp) / float(fp+tn)
     acc = float(tp+tn)/dist.size
@@ -105,19 +106,19 @@ def calculate_val(thresholds, embeddings1, embeddings2, actual_issame, far_targe
     nrof_pairs = min(len(actual_issame), embeddings1.shape[0])
     nrof_thresholds = len(thresholds)
     k_fold = KFold(n_splits=nrof_folds, shuffle=False)
-    
+
     val = np.zeros(nrof_folds)
     far = np.zeros(nrof_folds)
-    
+
     indices = np.arange(nrof_pairs)
-    
+
     for fold_idx, (train_set, test_set) in enumerate(k_fold.split(indices)):
         if subtract_mean:
             mean = np.mean(np.concatenate([embeddings1[train_set], embeddings2[train_set]]), axis=0)
         else:
           mean = 0.0
         dist = distance(embeddings1-mean, embeddings2-mean, distance_metric)
-      
+
         # Find the threshold that gives FAR = far_target
         far_train = np.zeros(nrof_thresholds)
         for threshold_idx, threshold in enumerate(thresholds):
@@ -127,9 +128,9 @@ def calculate_val(thresholds, embeddings1, embeddings2, actual_issame, far_targe
             threshold = f(far_target)
         else:
             threshold = 0.0
-    
+
         val[fold_idx], far[fold_idx] = calculate_val_far(threshold, dist[test_set], actual_issame[test_set])
-  
+
     val_mean = np.mean(val)
     far_mean = np.mean(far)
     val_std = np.std(val)

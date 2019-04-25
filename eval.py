@@ -49,7 +49,8 @@ def main():
     assert features.shape[0] == 2*len(lbs), "{} vs {}".format(features.shape[0], 2*len(lbs))
 
     features = normalize(features)
-    _, _, acc, val, val_std, far = evaluate(features, lbs, nrof_folds=args.nfolds)
+    _, _, acc, val, val_std, far = evaluate(features, lbs,
+                            nrof_folds=args.nfolds, distance_metric=0)
     print("accuracy: {:.4f}({:.4f})".format(acc.mean(), acc.std()))
 
 
