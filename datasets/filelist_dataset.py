@@ -30,7 +30,7 @@ class FileListDataset(Dataset):
         return self.num
 
     def _read(self, idx=None):
-        if idx == None:
+        if idx is None:
             idx = np.random.randint(self.num)
         fn = self.img_lst[idx]
         lb = self.lb_lst[idx]
