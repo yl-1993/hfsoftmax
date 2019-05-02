@@ -20,7 +20,7 @@ import models
 from models import ParameterClient
 from logger import create_logger
 from datasets import FileListDataset, DistSequentialSampler
-from utils import AverageMeter, accuracy, save_ckpt, load_ckpt, init_processes
+from utils import *
 
 
 model_names = sorted(name for name in models.__dict__
@@ -64,7 +64,7 @@ parser.add_argument('--num-classes', default=1000, type=int,
                     metavar='N', help='number of classes (default: 1000)')
 parser.add_argument('--sample-num', default=1000, type=int,
                     help='sampling number of classes out of all classes')
-parser.add_argument('--logger.info-freq', default=10, type=int,
+parser.add_argument('--print-freq', default=100, type=int,
                     help='logger.info frequency (default: 10)')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
@@ -72,8 +72,6 @@ parser.add_argument('--save-path', default='checkpoints/ckpt', type=str,
                     help='path to store checkpoint (default: checkpoints)')
 parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                     help='evaluate model on validation set')
-parser.add_argument('--pretrained', dest='pretrained', action='store_true',
-                    help='use pre-trained model')
 parser.add_argument('--sampled', dest='sampled', action='store_true',
                     help='sampling from full softmax')
 parser.add_argument('--classifier-type', default='linear', choices=classifier_types,
@@ -96,6 +94,15 @@ def main():
     global args, best_prec1
     args = parser.parse_args()
 
+    # init dist
+    gpu_num = torch.cuda.device_count()
+    if args.distributed:
+        args.rank, args.world_size = init_processes(args.dist_addr, args.dist_port, gpu_num, args.dist_backend)
+        print("=> using {} GPUS for distributed training".format(args.world_size))
+    else:
+        args.rank = 0
+        print("=> using {} GPUS for training".format(gpu_num))
+
     # create logger
     if args.rank == 0:
         mkdir_if_no_exist(args.save_path, subdirs=['events/', 'logs/', 'checkpoints/'])
@@ -105,15 +112,6 @@ def main():
     else:
         tb_logger = None
         logger = None
-
-    # init dist
-    gpu_num = torch.cuda.device_count()
-    if args.distributed:
-        args.rank, args.world_size = init_processes(args.dist_addr, args.dist_port, gpu_num, args.dist_backend)
-        logger.info("=> using {} GPUS for distributed training".format(args.world_size))
-    else:
-        args.rank = 0
-        logger.info("=> using {} GPUS for training".format(gpu_num))
 
     # init data loader
     normalize = transforms.Normalize(mean=[0.5, 0.5, 0.5],
@@ -153,12 +151,8 @@ def main():
         num_workers=args.workers, pin_memory=True, sampler=val_sampler)
 
     # create model
-    if args.pretrained:
-        logger.info("=> using pre-trained model '{}'".format(args.arch))
-        model = models.__dict__[args.arch](feature_dim=args.feature_dim, pretrained=True)
-    else:
-        logger.info("=> creating model '{}'".format(args.arch))
-        model = models.__dict__[args.arch](feature_dim=args.feature_dim)
+    print("=> creating model '{}'".format(args.arch))
+    model = models.__dict__[args.arch](feature_dim=args.feature_dim)
 
     if args.sampled:
         if args.rank > 0:
@@ -175,7 +169,7 @@ def main():
     else:
         model.cuda()
         model = torch.nn.parallel.DistributedDataParallel(model, [args.rank])
-        logger.info('create DistributedDataParallel model successfully', args.rank)
+        print('create DistributedDataParallel model successfully', args.rank)
 
     # define loss function (criterion) and optimizer
     criterion = nn.CrossEntropyLoss().cuda()
@@ -193,11 +187,11 @@ def main():
                     cls_resume = args.resume.replace('.pth.tar', '_cls.h5')
                     if os.path.isfile(cls_resume):
                         client.resume(cls_resume)
-                        logger.info("=> loaded checkpoint '{}' (epoch {})".format(cls_resume, checkpoint['epoch']))
+                        print("=> loaded checkpoint '{}' (epoch {})".format(cls_resume, checkpoint['epoch']))
                     else:
-                        logger.info("=> no checkpoint found at '{}'".format(cls_resume))
+                        print("=> no checkpoint found at '{}'".format(cls_resume))
         else:
-            logger.info("=> no checkpoint found at '{}'".format(args.resume))
+            print("=> no checkpoint found at '{}'".format(args.resume))
 
     cudnn.benchmark = True
 

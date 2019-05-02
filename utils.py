@@ -150,3 +150,12 @@ def save_imgs(imgs, ofolder):
         img.save(opath, "JPEG")
     else:
         raise TypeError('axis value should be 0 or 1(cannot handel axis {})'.format(axis))
+
+
+def mkdir_if_no_exist(path, subdirs=['']):
+    if path == '':
+        return
+    for sd in subdirs:
+        d = os.path.dirname(os.path.join(path, sd))
+        if not os.path.exists(d):
+            os.makedirs(d)
