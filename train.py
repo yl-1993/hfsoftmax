@@ -14,11 +14,13 @@ import torch.optim
 import torch.utils.data
 import torch.utils.data.distributed
 import torchvision.transforms as transforms
+from tensorboardX import SummaryWriter
 
 import models
+from models import ParameterClient
+from logger import create_logger
 from datasets import FileListDataset, DistSequentialSampler
 from utils import AverageMeter, accuracy, save_ckpt, load_ckpt, init_processes
-from models import ParameterClient
 
 
 model_names = sorted(name for name in models.__dict__
@@ -62,8 +64,8 @@ parser.add_argument('--num-classes', default=1000, type=int,
                     metavar='N', help='number of classes (default: 1000)')
 parser.add_argument('--sample-num', default=1000, type=int,
                     help='sampling number of classes out of all classes')
-parser.add_argument('--print-freq', default=10, type=int,
-                    help='print frequency (default: 10)')
+parser.add_argument('--logger.info-freq', default=10, type=int,
+                    help='logger.info frequency (default: 10)')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
 parser.add_argument('--save-path', default='checkpoints/ckpt', type=str,
@@ -94,14 +96,24 @@ def main():
     global args, best_prec1
     args = parser.parse_args()
 
-    gpu_num = torch.cuda.device_count()
+    # create logger
+    if args.rank == 0:
+        mkdir_if_no_exist(args.save_path, subdirs=['events/', 'logs/', 'checkpoints/'])
+        tb_logger = SummaryWriter('{}/events'.format(args.save_path))
+        logger = create_logger('global_logger', '{}/logs/log.txt'.format(args.save_path))
+        logger.debug(args) # log args only to file
+    else:
+        tb_logger = None
+        logger = None
 
+    # init dist
+    gpu_num = torch.cuda.device_count()
     if args.distributed:
         args.rank, args.world_size = init_processes(args.dist_addr, args.dist_port, gpu_num, args.dist_backend)
-        print("=> using {} GPUS for distributed training".format(args.world_size))
+        logger.info("=> using {} GPUS for distributed training".format(args.world_size))
     else:
         args.rank = 0
-        print("=> using {} GPUS for training".format(gpu_num))
+        logger.info("=> using {} GPUS for training".format(gpu_num))
 
     # init data loader
     normalize = transforms.Normalize(mean=[0.5, 0.5, 0.5],
@@ -142,10 +154,10 @@ def main():
 
     # create model
     if args.pretrained:
-        print("=> using pre-trained model '{}'".format(args.arch))
+        logger.info("=> using pre-trained model '{}'".format(args.arch))
         model = models.__dict__[args.arch](feature_dim=args.feature_dim, pretrained=True)
     else:
-        print("=> creating model '{}'".format(args.arch))
+        logger.info("=> creating model '{}'".format(args.arch))
         model = models.__dict__[args.arch](feature_dim=args.feature_dim)
 
     if args.sampled:
@@ -163,7 +175,7 @@ def main():
     else:
         model.cuda()
         model = torch.nn.parallel.DistributedDataParallel(model, [args.rank])
-        print('create DistributedDataParallel model successfully', args.rank)
+        logger.info('create DistributedDataParallel model successfully', args.rank)
 
     # define loss function (criterion) and optimizer
     criterion = nn.CrossEntropyLoss().cuda()
@@ -181,16 +193,17 @@ def main():
                     cls_resume = args.resume.replace('.pth.tar', '_cls.h5')
                     if os.path.isfile(cls_resume):
                         client.resume(cls_resume)
-                        print("=> loaded checkpoint '{}' (epoch {})".format(cls_resume, checkpoint['epoch']))
+                        logger.info("=> loaded checkpoint '{}' (epoch {})".format(cls_resume, checkpoint['epoch']))
                     else:
-                        print("=> no checkpoint found at '{}'".format(cls_resume))
+                        logger.info("=> no checkpoint found at '{}'".format(cls_resume))
         else:
-            print("=> no checkpoint found at '{}'".format(args.resume))
+            logger.info("=> no checkpoint found at '{}'".format(args.resume))
 
     cudnn.benchmark = True
 
     if args.evaluate:
-        validate(val_loader, model, criterion, args.sampled)
+        validate(val_loader, model, criterion,
+                args.print_freq, args.rank, logger, args.sampled)
         return
 
     assert max(args.lr_steps) < args.epochs
@@ -201,14 +214,19 @@ def main():
             train_sampler.set_epoch(epoch)
 
         # train for one epoch
-        train(train_loader, model, criterion, optimizer, epoch, args.sampled)
+        train(train_loader, model, criterion, optimizer, epoch,
+                args.print_freq, args.rank, logger, tb_logger, args.sampled)
         lr_scheduler.step()
 
         # evaluate on validation set
-        prec1 = validate(val_loader, model, criterion, args.sampled)
+        prec1, loss = validate(val_loader, model, criterion,
+                args.print_freq, args.rank, logger, args.sampled)
 
         # remember best prec@1 and save checkpoint
         if args.rank == 0:
+            if tb_logger is not None:
+                tb_logger.add_scalar('test_acc', prec1, epoch)
+                tb_logger.add_scalar('test_loss', loss, epoch)
             is_best = prec1 > best_prec1
             best_prec1 = max(prec1, best_prec1)
             save_ckpt({
@@ -223,7 +241,8 @@ def main():
                     client.snapshot('{}_epoch_{}_cls.h5'.format(args.save_path, epoch + 1))
 
 
-def train(train_loader, model, criterion, optimizer, epoch, sampled=None):
+def train(train_loader, model, criterion, optimizer, epoch,
+        print_freq, rank, logger, tb_logger=None, sampled=None):
     batch_time = AverageMeter(10)
     data_time = AverageMeter(10)
     losses = AverageMeter(10)
@@ -261,8 +280,8 @@ def train(train_loader, model, criterion, optimizer, epoch, sampled=None):
         batch_time.update(time.time() - end)
         end = time.time()
 
-        if i % args.print_freq == 0 and args.rank == 0:
-            print('Epoch: [{0}][{1}/{2}]\t'
+        if i % print_freq == 0 and rank == 0 and logger is not None:
+            logger.info('Epoch: [{0}][{1}/{2}]\t'
                   'LR: {3}\t'
                   'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                   'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
@@ -272,12 +291,18 @@ def train(train_loader, model, criterion, optimizer, epoch, sampled=None):
                    optimizer.param_groups[0]['lr'],
                    batch_time=batch_time,
                    data_time=data_time, loss=losses, top1=top1))
+            if tb_logger is not None:
+                _iter = epoch * len(train_loader) + i
+                tb_logger.add_scalar('train_acc', top1.avg, _iter)
+                tb_logger.add_scalar('train_loss', losses.avg, _iter)
 
 
-def validate(val_loader, model, criterion, sampled=None):
+def validate(val_loader, model, criterion,
+        print_freq, rank, logger, sampled=None):
+    n = len(val_loader)
     batch_time = AverageMeter(10)
-    losses = AverageMeter(10)
-    top1 = AverageMeter(10)
+    losses = AverageMeter(n)
+    top1 = AverageMeter(n)
 
     model.eval()
 
@@ -299,17 +324,17 @@ def validate(val_loader, model, criterion, sampled=None):
             batch_time.update(time.time() - end)
             end = time.time()
 
-            if i % args.print_freq == 0 and args.rank == 0:
-                print('Test: [{0}/{1}]\t'
+            if i % print_freq == 0 and rank == 0 and logger is not None:
+                logger.info('Test: [{0}/{1}]\t'
                       'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                       'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'.format(
                        i, len(val_loader), batch_time=batch_time, loss=losses,
                        top1=top1))
 
-        print(' * Prec@1 {top1.avg:.3f}'.format(top1=top1))
+        logger.info(' * Prec@1 {top1.avg:.3f}'.format(top1=top1))
 
-    return top1.avg
+    return top1.avg, losses.avg
 
 
 if __name__ == '__main__':
