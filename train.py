@@ -25,6 +25,8 @@ model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
     and callable(models.__dict__[name]))
 
+classifier_types = sorted(name for name in models.__factory_classifier__)
+
 
 parser = argparse.ArgumentParser(description='PyTorch Face Classification Training')
 parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet50',
@@ -72,8 +74,8 @@ parser.add_argument('--pretrained', dest='pretrained', action='store_true',
                     help='use pre-trained model')
 parser.add_argument('--sampled', dest='sampled', action='store_true',
                     help='sampling from full softmax')
-parser.add_argument('--sampler-type', default='hf', type=str,
-                    help='choose different type of samplers (default: hf)')
+parser.add_argument('--classifier-type', default='linear', choices=classifier_types,
+                    help='choose different type of classifier')
 parser.add_argument('--distributed', dest='distributed', action='store_true',
                     help='distributed training')
 parser.add_argument('--dist-addr', default='127.0.0.1', type=str,
@@ -113,9 +115,7 @@ def main():
         if args.rank > 0:
             assert args.distributed
         assert args.sample_num <= args.num_classes
-        model = models.samplerClassifier[args.sampler_type](model, args.rank, args.feature_dim, args.sample_num, args.num_classes)
-    else:
-        model = models.Classifier(model, args.feature_dim, args.num_classes)
+    model = models.build_classifier(args.classifier_type, model, **args.__dict__)
 
     if not args.distributed:
         if args.arch.startswith('alexnet') or args.arch.startswith('vgg'):
@@ -240,7 +240,7 @@ def train(train_loader, model, criterion, optimizer, epoch, sampled=None):
 
         # compute output
         if not sampled:
-            output = model(input)
+            output = model(input, target)
         else:
             output, target = model(input, target)
         loss = criterion(output, target)
@@ -285,7 +285,7 @@ def validate(val_loader, model, criterion, sampled=None):
             target = target.cuda(non_blocking=True)
 
             if not sampled:
-                output = model(input)
+                output = model(input, target)
             else:
                 output, target = model(input, target)
             loss = criterion(output, target)
