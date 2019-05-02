@@ -16,7 +16,7 @@ import torch.utils.data.distributed
 import torchvision.transforms as transforms
 
 import models
-from datasets import FileListDataset
+from datasets import FileListDataset, DistSequentialSampler
 from utils import AverageMeter, accuracy, save_ckpt, load_ckpt, init_processes
 from models import ParameterClient
 
@@ -97,11 +97,48 @@ def main():
     gpu_num = torch.cuda.device_count()
 
     if args.distributed:
-        args.rank, args.size = init_processes(args.dist_addr, args.dist_port, gpu_num, args.dist_backend)
-        print("=> using {} GPUS for distributed training".format(args.size))
+        args.rank, args.world_size = init_processes(args.dist_addr, args.dist_port, gpu_num, args.dist_backend)
+        print("=> using {} GPUS for distributed training".format(args.world_size))
     else:
         args.rank = 0
         print("=> using {} GPUS for training".format(gpu_num))
+
+    # init data loader
+    normalize = transforms.Normalize(mean=[0.5, 0.5, 0.5],
+                                     std=[0.25, 0.25, 0.25])
+    train_dataset = FileListDataset(
+        args.train_filelist,
+        args.train_prefix,
+        transforms.Compose([
+            transforms.Resize(args.input_size),
+            transforms.ToTensor(),
+            normalize,
+        ]))
+    val_dataset = FileListDataset(
+        args.val_filelist,
+        args.val_prefix,
+        transforms.Compose([
+            transforms.Resize(args.input_size),
+            transforms.ToTensor(),
+            normalize,
+        ]))
+
+    if args.distributed:
+        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+        val_sampler = DistSequentialSampler(val_dataset, args.world_size, args.rank)
+    else:
+        train_sampler = None
+        val_sampler = None
+
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
+        num_workers=args.workers, pin_memory=True, sampler=train_sampler)
+
+    if args.test_batch_size is None:
+        args.test_batch_size = 2 * args.batch_size
+    val_loader = torch.utils.data.DataLoader(
+        val_dataset, batch_size=args.test_batch_size, shuffle=False,
+        num_workers=args.workers, pin_memory=True, sampler=val_sampler)
 
     # create model
     if args.pretrained:
@@ -151,41 +188,6 @@ def main():
             print("=> no checkpoint found at '{}'".format(args.resume))
 
     cudnn.benchmark = True
-
-    normalize = transforms.Normalize(mean=[0.5, 0.5, 0.5],
-                                     std=[0.25, 0.25, 0.25])
-
-    train_dataset = FileListDataset(
-        args.train_filelist,
-        args.train_prefix,
-        transforms.Compose([
-            transforms.Resize(args.input_size),
-            transforms.ToTensor(),
-            normalize,
-        ]))
-
-    if args.distributed:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
-    else:
-        train_sampler = None
-
-    train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
-        num_workers=args.workers, pin_memory=True, sampler=train_sampler)
-
-    if args.test_batch_size is None:
-        args.test_batch_size = 2 * args.batch_size
-    val_loader = torch.utils.data.DataLoader(
-        FileListDataset(
-        args.val_filelist,
-        args.val_prefix,
-        transforms.Compose([
-            transforms.Resize(args.input_size),
-            transforms.ToTensor(),
-            normalize,
-        ])),
-        batch_size=args.test_batch_size, shuffle=False,
-        num_workers=args.workers, pin_memory=True)
 
     if args.evaluate:
         validate(val_loader, model, criterion, args.sampled)
