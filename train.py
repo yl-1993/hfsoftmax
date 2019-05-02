@@ -325,8 +325,8 @@ def validate(val_loader, model, criterion,
                       'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'.format(
                        i, len(val_loader), batch_time=batch_time, loss=losses,
                        top1=top1))
-
-        logger.info(' * Prec@1 {top1.avg:.3f}'.format(top1=top1))
+        if rank == 0:
+            logger.info(' * Prec@1 {top1.avg:.3f}'.format(top1=top1))
 
     return top1.avg, losses.avg
 

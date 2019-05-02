@@ -14,11 +14,12 @@ class DistSequentialSampler(Sampler):
         sub_num = int(math.ceil(1. * dataset.num / world_size))
         # add extra samples to make it evenly divisible
         tot_num = sub_num * world_size
+        self.dsize = dataset.num
         self.beg = sub_num * rank
         self.end = min(self.beg + sub_num, tot_num)
 
     def __iter__(self):
-        indices = list(range(self.beg, self.end))
+        indices = [i % self.dsize for i in range(self.beg, self.end)]
         return iter(indices)
 
     def __len__(self):
