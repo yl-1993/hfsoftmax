@@ -1,5 +1,6 @@
 from .resnet import *
 from .hynet import *
+from .ir import *
 from .classifier import *
 from .ext_layers import ParameterClient
 
