@@ -87,7 +87,7 @@ def load_ckpt(path, model, ignores=[], strict=True, optimizer=None):
         checkpoint = torch.load(path, map_location=map_func)
         if len(ignores) > 0:
             assert optimizer == None
-            keys = list(checkpoint['state_dict'].keys())
+            keys = set(checkpoint['state_dict'].keys())
             for ignore in ignores:
                 if ignore in keys:
                     print('ignoring {}'.format(ignore))
@@ -105,6 +105,36 @@ def load_ckpt(path, model, ignores=[], strict=True, optimizer=None):
             optimizer.load_state_dict(checkpoint['optimizer'])
             print("=> loaded checkpoint '{}' (step {})".format(path, checkpoint['epoch']))
             return checkpoint['epoch'], checkpoint['best_prec1']
+    else:
+        assert False, "=> no checkpoint found at '{}'".format(path)
+
+
+def simplify_ckpt(path, opath='', ignores=[]):
+    def map_func(storage, location):
+        return storage.cuda()
+    if os.path.isfile(path):
+        print("=> loading checkpoint '{}'".format(path))
+        checkpoint = torch.load(path, map_location=map_func)
+        keys = list(checkpoint.keys())
+        for key in keys:
+            if key == 'state_dict':
+                continue
+            del checkpoint[key]
+        if len(ignores) >= 0:
+            keys = set(checkpoint['state_dict'].keys())
+            for ignore in ignores:
+                if ignore in keys:
+                    print('ignoring {}'.format(ignore))
+                    del checkpoint['state_dict'][ignore]
+                else:
+                    for k in keys:
+                        if k.find('base') < 0:
+                            print(k, checkpoint['state_dict'][k].shape)
+                    raise ValueError('cannot find {} in load_path'.format(ignore))
+        if opath == '':
+            opath = path + '_simplified'
+        print("=> saving simplified checkpoint to '{}'".format(opath))
+        torch.save(checkpoint, opath)
     else:
         assert False, "=> no checkpoint found at '{}'".format(path)
 
