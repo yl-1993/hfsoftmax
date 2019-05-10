@@ -208,7 +208,7 @@ class InceptionResNetV2(nn.Module):
 
     def __init__(self, feature_dim):
         super(InceptionResNetV2, self).__init__()
-        self.conv2d_1a = BasicConv2d(3, 32, kernel_size=3, stride=2)
+        self.conv2d_1a = BasicConv2d(3, 32, kernel_size=3, stride=1)
         self.conv2d_2a = BasicConv2d(32, 32, kernel_size=3, stride=1)
         self.conv2d_2b = BasicConv2d(32, 64, kernel_size=3, stride=1, padding=1)
         self.maxpool_3a = nn.MaxPool2d(3, stride=2)
@@ -266,7 +266,7 @@ class InceptionResNetV2(nn.Module):
         self.block8 = Block8(noReLU=True)
         self.conv2d_7b = BasicConv2d(2080, 1536, kernel_size=1, stride=1)
         # self.dropout = nn.Dropout(p=0.5, inplace=True)
-        self.feature = nn.Linear(2*2*1536, feature_dim)
+        self.feature = nn.Linear(5*5*1536, feature_dim)
 
     def forward(self, x):
         x = self.conv2d_1a(x)
