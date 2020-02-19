@@ -4,7 +4,6 @@ from .ir import *
 from .classifier import *
 from .ext_layers import ParameterClient
 
-
 __factory_classifier__ = {
     'linear': Classifier,
     'cosface': CosFaceClassifier,

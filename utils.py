@@ -47,7 +47,7 @@ class AverageMeter(object):
         self.avg = np.mean(self.history)
 
 
-def accuracy(output, target, topk=(1,)):
+def accuracy(output, target, topk=(1, )):
     """Computes the precision@k for the specified values of k"""
     with torch.no_grad():
         maxk = max(topk)
@@ -67,7 +67,7 @@ def accuracy(output, target, topk=(1,)):
 def save_ckpt(state, ckpt, epoch, is_best):
     folder = os.path.dirname(ckpt)
     fn = '{}_epoch_{}.pth.tar'.format(os.path.basename(ckpt), epoch)
-    if folder != ''and not os.path.exists(folder):
+    if folder != '' and not os.path.exists(folder):
         os.makedirs(folder)
     path = os.path.join(folder, fn)
     print('saving to {}'.format(path))
@@ -82,6 +82,7 @@ def save_ckpt(state, ckpt, epoch, is_best):
 def load_ckpt(path, model, ignores=[], strict=True, optimizer=None):
     def map_func(storage, location):
         return storage.cuda()
+
     if os.path.isfile(path):
         print("=> loading checkpoint '{}'".format(path))
         checkpoint = torch.load(path, map_location=map_func)
@@ -93,7 +94,8 @@ def load_ckpt(path, model, ignores=[], strict=True, optimizer=None):
                     print('ignoring {}'.format(ignore))
                     del checkpoint['state_dict'][ignore]
                 else:
-                    raise ValueError('cannot find {} in load_path'.format(ignore))
+                    raise ValueError(
+                        'cannot find {} in load_path'.format(ignore))
         model.load_state_dict(checkpoint['state_dict'], strict=strict)
         if not strict:
             pretrained_keys = set(checkpoint['state_dict'].keys())
@@ -103,7 +105,8 @@ def load_ckpt(path, model, ignores=[], strict=True, optimizer=None):
         if optimizer != None:
             assert len(ignores) == 0
             optimizer.load_state_dict(checkpoint['optimizer'])
-            print("=> loaded checkpoint '{}' (step {})".format(path, checkpoint['epoch']))
+            print("=> loaded checkpoint '{}' (step {})".format(
+                path, checkpoint['epoch']))
             return checkpoint['epoch'], checkpoint['best_prec1']
     else:
         assert False, "=> no checkpoint found at '{}'".format(path)
@@ -112,6 +115,7 @@ def load_ckpt(path, model, ignores=[], strict=True, optimizer=None):
 def simplify_ckpt(path, opath='', ignores=[]):
     def map_func(storage, location):
         return storage.cuda()
+
     if os.path.isfile(path):
         print("=> loading checkpoint '{}'".format(path))
         checkpoint = torch.load(path, map_location=map_func)
@@ -130,7 +134,8 @@ def simplify_ckpt(path, opath='', ignores=[]):
                     for k in keys:
                         if k.find('base') < 0:
                             print(k, checkpoint['state_dict'][k].shape)
-                    raise ValueError('cannot find {} in load_path'.format(ignore))
+                    raise ValueError(
+                        'cannot find {} in load_path'.format(ignore))
         if opath == '':
             opath = path + '_simplified'
         print("=> saving simplified checkpoint to '{}'".format(opath))
@@ -164,7 +169,7 @@ def bin_loader(path):
         else:
             raise EnvironmentError('Only support python 2 or 3')
     bins, lbs = data
-    assert len(bins) == 2*len(lbs)
+    assert len(bins) == 2 * len(lbs)
     imgs = [pil_loader(b) for b in bins]
     return imgs, lbs
 
@@ -179,7 +184,8 @@ def save_imgs(imgs, ofolder):
             os.makedirs(os.path.dirname(opath))
         img.save(opath, "JPEG")
     else:
-        raise TypeError('axis value should be 0 or 1(cannot handel axis {})'.format(axis))
+        raise TypeError(
+            'axis value should be 0 or 1(cannot handel axis {})'.format(axis))
 
 
 def mkdir_if_no_exist(path, subdirs=['']):

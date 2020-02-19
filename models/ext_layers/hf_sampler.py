@@ -13,11 +13,17 @@ from multiprocessing.dummy import Pool
 
 
 class HFSamplerFunc(Function):
-
-    def __init__(self, client, anns, pool,
-                fdim, sample_num, num_output,
-                is_prob=False, bias=False,
-                midw='0', midb='1'):
+    def __init__(self,
+                 client,
+                 anns,
+                 pool,
+                 fdim,
+                 sample_num,
+                 num_output,
+                 is_prob=False,
+                 bias=False,
+                 midw='0',
+                 midb='1'):
         self.fdim = fdim
         self.num_output = num_output
         self.sample_num = sample_num
@@ -32,7 +38,8 @@ class HFSamplerFunc(Function):
         labels = labels.cpu().numpy()
         self.n_nbr = int(self.sample_num / labels.size + 1)
         self.rows, labels = self._annoy_share_mask(features, labels,
-                                            self.sample_num, self.num_output)
+                                                   self.sample_num,
+                                                   self.num_output)
         weights = self.client.get_value_by_rows(self.midw, self.rows)
         if not self.bias:
             bias = np.zeros([self.sample_num], dtype=np.float32)
@@ -48,9 +55,9 @@ class HFSamplerFunc(Function):
         """
         self.client.update_by_rows(self.midw, self.rows, grad_w.cpu().numpy())
         if self.bias:
-            self.client.update_by_rows(self.midb, self.rows, grad_b.cpu().numpy())
+            self.client.update_by_rows(self.midb, self.rows,
+                                       grad_b.cpu().numpy())
         return None, None
-
 
     """ private functions
     """
@@ -67,7 +74,7 @@ class HFSamplerFunc(Function):
         return idxs, lbs, lbs_size
 
     def _norm(self, lst):
-        return lst*1.0 / lst.sum()
+        return lst * 1.0 / lst.sum()
 
     def _get_nns_by_vector(self, v):
         return self.anns.get_nns_by_vector(v, self.n_nbr)
@@ -89,7 +96,9 @@ class HFSamplerFunc(Function):
     def _annoy_prob(self, x, sample_num):
         nbrs, probs = [], []
         for v in x:
-            nbr, prob = self.anns.get_nns_by_vector(v, self.n_nbr, include_distances=True)
+            nbr, prob = self.anns.get_nns_by_vector(v,
+                                                    self.n_nbr,
+                                                    include_distances=True)
             nbrs.extend(nbr)
             probs.extend(prob)
         probs = self._norm(np.array(probs))
@@ -111,7 +120,7 @@ class HFSamplerFunc(Function):
             random.shuffle(neg_lbs)
             neg_lbs = neg_lbs[:rnum]
         else:
-            rneg = set(range(num_output)).difference(set(neg_lbs)|set(lbs))
+            rneg = set(range(num_output)).difference(set(neg_lbs) | set(lbs))
             neg_lbs += random.sample(list(rneg), rnum - len(neg_lbs))
         selected_cls = np.append(np.array(lbs), np.array(neg_lbs))
         assert len(selected_cls) == sample_num, \
@@ -121,10 +130,17 @@ class HFSamplerFunc(Function):
 
 
 class HFSampler(Module):
-
-    def __init__(self, rank, fdim, sample_num, num_output, bias=False,
-                ntrees=50, interval=100, start_iter=0,
-                midw='0', midb='1'):
+    def __init__(self,
+                 rank,
+                 fdim,
+                 sample_num,
+                 num_output,
+                 bias=False,
+                 ntrees=50,
+                 interval=100,
+                 start_iter=0,
+                 midw='0',
+                 midb='1'):
         super(HFSampler, self).__init__()
         self.rank = rank
         self.fdim = fdim
@@ -150,9 +166,12 @@ class HFSampler(Module):
 
     def __repr__(self):
         return ('{name}({rank}, fdim={fdim}, sample_num={sample_num},'
-                ' num_output={num_output})'
-                .format(name=self.__class__.__name__, rank=self.rank, fdim=self.fdim,
-                        sample_num=self.sample_num, num_output=self.num_output))
+                ' num_output={num_output})'.format(
+                    name=self.__class__.__name__,
+                    rank=self.rank,
+                    fdim=self.fdim,
+                    sample_num=self.sample_num,
+                    num_output=self.num_output))
 
     def _update_hf(self):
         if not self.iter % self.interval == 0 and \
@@ -168,16 +187,23 @@ class HFSampler(Module):
         if self.training:
             self._update_hf()
             self.iter += 1
-            return HFSamplerFunc(self.client, self.anns, self.pool, self.fdim,
-                    self.sample_num, self.num_output, bias=self.is_bias)(features, labels)
+            return HFSamplerFunc(self.client,
+                                 self.anns,
+                                 self.pool,
+                                 self.fdim,
+                                 self.sample_num,
+                                 self.num_output,
+                                 bias=self.is_bias)(features, labels)
         else:
             if self.iter > self.test_iter:
                 self.test_iter = self.iter
-                self.weights = self.client.get_value_by_rows(self.midw, self.full_cls)
+                self.weights = self.client.get_value_by_rows(
+                    self.midw, self.full_cls)
                 if not self.is_bias:
                     self.bias = np.zeros([self.num_output], dtype=np.float32)
                 else:
-                    self.bias = self.client.get_value_by_rows(self.midb, self.full_cls)
+                    self.bias = self.client.get_value_by_rows(
+                        self.midb, self.full_cls)
             return torch.from_numpy(self.weights).cuda(), \
                    torch.from_numpy(self.bias).cuda(), \
                    labels

@@ -4,7 +4,6 @@ from torch.nn.modules.module import Module
 
 
 class IdentFunc(Function):
-
     def __init__(self):
         pass
 
@@ -16,7 +15,6 @@ class IdentFunc(Function):
 
 
 class Ident(Module):
-
     def __init__(self):
         super(Ident, self).__init__()
         self.ident = IdentFunc()

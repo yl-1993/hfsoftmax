@@ -1,6 +1,5 @@
 import torch.nn as nn
 
-
 __all__ = ['hynet']
 
 
@@ -14,7 +13,6 @@ cfg = {
 
 
 class Hynet(nn.Module):
-
     def __init__(self, base, feature_dim=256):
         super(Hynet, self).__init__()
         # TODO: enable different types of fully-connected
@@ -24,7 +22,9 @@ class Hynet(nn.Module):
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                nn.init.kaiming_normal_(m.weight,
+                                        mode='fan_out',
+                                        nonlinearity='relu')
             elif isinstance(m, nn.BatchNorm2d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
@@ -52,7 +52,6 @@ def make_layers(cfg):
     layers += [nn.Conv2d(in_channels, out_channels, 1, bias=False), \
                 nn.BatchNorm2d(out_channels), nn.ReLU(inplace=True)]
     return nn.Sequential(*layers)
-
 
 
 def hynet(**kwargs):

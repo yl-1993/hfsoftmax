@@ -9,7 +9,7 @@ import numpy as np
 
 
 def init_gaussian(shape, order='C'):
-    arr = 0.01*np.random.randn(*shape).astype(np.float32)
+    arr = 0.01 * np.random.randn(*shape).astype(np.float32)
     if order == 'F':
         return np.asfortranarray(arr)
     else:
@@ -37,7 +37,7 @@ class Optim(dict):
 
 class ParameterServer(threading.Thread):
     def __init__(self):
-        threading.Thread.__init__ (self)
+        threading.Thread.__init__(self)
 
     def run(self):
         context = zmq.Context()
@@ -59,7 +59,7 @@ class ParameterServer(threading.Thread):
 
 class ParameterWorker(threading.Thread):
     def __init__(self, context, lr=0.01, weight_decay=1e-4, momentum=0.9):
-        threading.Thread.__init__ (self)
+        threading.Thread.__init__(self)
         self.context = context
         self.clients = {}
         self.grads = {}
@@ -87,7 +87,7 @@ class ParameterWorker(threading.Thread):
         # we have to teminate it in a not graceful way
         if self.context:
             print('Terminate proxy ... ')
-            time.sleep(1.) # make sure proxy pass the last msg to clients
+            time.sleep(1.)  # make sure proxy pass the last msg to clients
             self.context.term()
 
     """ comm
@@ -109,7 +109,7 @@ class ParameterWorker(threading.Thread):
         return True
 
     def _recv(self):
-        # TODO: 
+        # TODO:
         #   1. use logging to better log server info
         #   2. better exception handling
         print('waiting for message ... ')
@@ -126,7 +126,8 @@ class ParameterWorker(threading.Thread):
                 msg['rows'] = self._buf_to_ndarray(data, meta)
         elif len(packet) == 6:
             ident, msg, rows_meta, rows_data, val_meta, val_data = packet
-            msg, rows_meta, val_meta = map(self._parse_json, [msg, rows_meta, val_meta])
+            msg, rows_meta, val_meta = map(self._parse_json,
+                                           [msg, rows_meta, val_meta])
             msg['rows'] = self._buf_to_ndarray(rows_data, rows_meta)
             msg['data'] = self._buf_to_ndarray(val_data, val_meta)
         else:
@@ -147,10 +148,7 @@ class ParameterWorker(threading.Thread):
 
     def _send(self, ident, data):
         assert isinstance(data, np.ndarray)
-        meta = {
-            'dtype': str(data.dtype),
-            'shape': data.shape
-        }
+        meta = {'dtype': str(data.dtype), 'shape': data.shape}
         self._socket.send(ident, zmq.SNDMORE)
         self._socket.send_json(meta)
         self._socket.send_multipart([ident, data])
@@ -162,10 +160,12 @@ class ParameterWorker(threading.Thread):
         print('receiving {} from {}'.format(op, ident))
         if op == 'register':
             self.clients[ident] = {}
-            print('Client {} register. ({} clients in total).'.format(ident, len(self.clients)))
+            print('Client {} register. ({} clients in total).'.format(
+                ident, len(self.clients)))
         elif op == 'exit':
             del self.clients[ident]
-            print('Client {} exit. ({} clients in total).'.format(ident, len(self.clients)))
+            print('Client {} exit. ({} clients in total).'.format(
+                ident, len(self.clients)))
         elif op == 'add_matrix':
             mid = msg['mid']
             self.add_matrix(mid, msg['shape'], init_uniform)
@@ -174,7 +174,7 @@ class ParameterWorker(threading.Thread):
             assert 'data' in msg
             force = False
             if 'force' in msg and msg['force']:
-                force= True
+                force = True
             self.set_matrix(msg['mid'], msg['data'], force)
             print('the value of matrix {} has been set.'.format(msg['mid']))
         elif op == 'get_value_by_rows':
@@ -184,7 +184,8 @@ class ParameterWorker(threading.Thread):
         elif op == 'set_value_by_rows':
             assert 'data' in msg
             self.set_value_by_rows(msg['mid'], msg['rows'], msg['data'])
-            print('the value of {} rows of matrix {} has been set.'.format(len(msg['rows']), msg['mid']))
+            print('the value of {} rows of matrix {} has been set.'.format(
+                len(msg['rows']), msg['mid']))
         elif op == 'update_params':
             self.update_params(msg)
         elif op == 'update_by_rows':
@@ -225,7 +226,7 @@ class ParameterWorker(threading.Thread):
         mid = self._build_mtable(mid)
         # TODO: add `force` to rm already built matrix
         if mid is None:
-            return 
+            return
         self.mtable[mid][self.wkey] = init_func(shape)
         print(self.mtable[mid][self.wkey].shape)
         if his:
@@ -235,11 +236,11 @@ class ParameterWorker(threading.Thread):
     def load_matrix(self, mid, h5group, his=True):
         mid = self._build_mtable(mid)
         if mid is None:
-            return 
+            return
         for key in h5group:
             if not key in self.support_keys:
                 raise KeyError('The {} is not in the support list'.format(key))
-            self.mtable[mid][key] = np.asfortranarray( h5group[key] )
+            self.mtable[mid][key] = np.asfortranarray(h5group[key])
             if key == self.hkey and not his:
                 self.mtable[mid][key].fill(0)
         self._check_order(mid)
@@ -275,7 +276,8 @@ class ParameterWorker(threading.Thread):
         """
         if self.optim.weight_decay > 0:
             if not skip_decay:
-                grad = self._l2_regularize(self.mtable[mid][self.wkey][rows, :], grad)
+                grad = self._l2_regularize(
+                    self.mtable[mid][self.wkey][rows, :], grad)
             pass
         self._sgd_update(mid, rows, grad)
 
@@ -290,7 +292,7 @@ class ParameterWorker(threading.Thread):
                 if key == 'lr':
                     assert val > 0
                 else:
-                    assert val >= 0 
+                    assert val >= 0
                 self.optim[key] = val
                 print("{} has been updated to {}".format(key, val))
 
@@ -308,7 +310,7 @@ class ParameterWorker(threading.Thread):
             print('resume from {} with history={}'.format(path, his))
             if self.key not in f.keys():
                 logging.warn('The model does not have {}'.format(self.key))
-                return 
+                return
             ps = f[self.key]
             for key in ps.keys():
                 self.load_matrix(key, ps[key], his)
@@ -316,10 +318,8 @@ class ParameterWorker(threading.Thread):
     def load(self, path):
         self.resume(path, his=False)
 
-
     """ private functions
     """
-        
     def _exists(self, mid):
         return (mid in self.mtable)
 
@@ -331,7 +331,9 @@ class ParameterWorker(threading.Thread):
         elif isinstance(mid, unicode):
             mid = mid.encode('ascii', 'ignore')
         else:
-            raise TypeError('The key({},{}) for Parameter Server should be str!'.format(mid, type(mid)))
+            raise TypeError(
+                'The key({},{}) for Parameter Server should be str!'.format(
+                    mid, type(mid)))
         if not self._exists(mid):
             self.mtable[mid] = {}
             return mid
@@ -362,7 +364,7 @@ class ParameterWorker(threading.Thread):
             grad += self.mtable[mid][self.hkey][rows, :] * self.optim.momentum
             self.mtable[mid][self.hkey][rows, :] = grad
         self.mtable[mid][self.wkey][rows, :] -= self.optim.lr * grad
-    
+
 
 if __name__ == "__main__":
     ps = ParameterServer()

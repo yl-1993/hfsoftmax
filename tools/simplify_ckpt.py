@@ -1,14 +1,19 @@
 import argparse
 import utils
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Simplify Model')
-    parser.add_argument('--in-path', type=str, required=True,
+    parser.add_argument('--in-path',
+                        type=str,
+                        required=True,
                         help='input pytorch model')
-    parser.add_argument('--out-path', type=str, default='',
+    parser.add_argument('--out-path',
+                        type=str,
+                        default='',
                         help='output simplified pytorch model')
-    parser.add_argument('--ignores', type=str, default='module.logits.weight,module.logits.bias',
+    parser.add_argument('--ignores',
+                        type=str,
+                        default='module.logits.weight,module.logits.bias',
                         help='ignored weights')
     args = parser.parse_args()
 

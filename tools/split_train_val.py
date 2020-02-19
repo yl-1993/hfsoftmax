@@ -27,8 +27,14 @@ def gen_train_val_list(folder, ofolder, val_ratio, ext='jpg'):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--folder', type=str, help="image folder", required=True)
-    parser.add_argument('--ofolder', type=str, default='./', help="output folder to save train/val list")
+    parser.add_argument('--folder',
+                        type=str,
+                        help="image folder",
+                        required=True)
+    parser.add_argument('--ofolder',
+                        type=str,
+                        default='./',
+                        help="output folder to save train/val list")
     parser.add_argument('--val-ratio', type=float, default=0.05)
     parser.add_argument("--seed", type=int, default=42, help="random seed")
     args = parser.parse_args()
