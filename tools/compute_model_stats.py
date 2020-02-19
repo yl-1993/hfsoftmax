@@ -15,7 +15,6 @@ def compute_param_number(model, bit_len=4):
         if k.endswith('num_batches_tracked') or k.endswith(
                 'running_mean') or k.endswith('running_var'):
             continue
-        # s = np.array(v.size())
         bits += np.prod(np.array(v.size())) * bit_len
 
     return bits / 1024 / 1024
@@ -71,7 +70,7 @@ def compute_flops(model, input_size, bs=1):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Compute Model Flops')
+    parser = argparse.ArgumentParser(description='Compute Model FLOPs and PN')
     parser.add_argument('--arch', default='resnet50', type=str)
     parser.add_argument('--feature_dim', default=256, type=int)
     parser.add_argument('--input_size', default=112, type=int)
