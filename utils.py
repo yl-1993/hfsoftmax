@@ -145,6 +145,8 @@ def simplify_ckpt(path, opath='', ignores=[]):
 
 
 def normalize(feat, axis=1):
+    if len(feat.shape) == 1:
+        return feat / np.linalg.norm(feat)
     if axis == 0:
         return feat / np.linalg.norm(feat, axis=0)
     elif axis == 1:
@@ -195,3 +197,21 @@ def mkdir_if_no_exist(path, subdirs=['']):
         d = os.path.dirname(os.path.join(path, sd))
         if not os.path.exists(d):
             os.makedirs(d)
+
+
+def read_feat(path, inst_num, feat_dim, dtype=np.float32, verbose=False):
+    assert (inst_num > 0 or inst_num == -1) and feat_dim > 0
+    count = -1
+    if inst_num > 0:
+        count = inst_num * feat_dim
+    probs = np.fromfile(path, dtype=dtype, count=count)
+    if feat_dim > 1:
+        probs = probs.reshape(inst_num, feat_dim)
+    if verbose:
+        print('[{}] shape: {}'.format(path, probs.shape))
+    return probs
+
+
+def write_feat(ofn, features):
+    print('save features to', ofn)
+    features.tofile(ofn)
