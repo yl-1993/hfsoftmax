@@ -70,6 +70,12 @@ If you use distributed training, set `strict=False` during feature extraction.
 Note that the bin file from InsightFace, `lfw.bin` for example, is pickled by Python2. It cannot be processed by Python 3.0+.
 You can either use Python2 for evaluation or re-pickle the bin file by Python3 first.
 
+## Feature Extraction
+
+```bash
+./scripts/extract_feat.sh prefix filelist load_path
+```
+
 ## Citation
 Please cite the following paper if you use this repository in your reseach.
 
