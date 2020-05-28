@@ -4,15 +4,26 @@ import mxnet as mx
 import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--in-folder", type=str, default='./', help="where stores .rec and .idx")
-parser.add_argument("--out-folder", type=str, default='./images/', help="output image folder and each subfolder stores images with same identity")
-parser.add_argument("--intvl", type=int, default=10000, help="interval of displaying processing progress")
+parser.add_argument("--in-folder",
+                    type=str,
+                    default='./',
+                    help="where stores .rec and .idx")
+parser.add_argument(
+    "--out-folder",
+    type=str,
+    default='./images/',
+    help=
+    "output image folder and each subfolder stores images with same identity")
+parser.add_argument("--intvl",
+                    type=int,
+                    default=10000,
+                    help="interval of displaying processing progress")
 args = parser.parse_args()
 
 if __name__ == '__main__':
     path_imgidx = os.path.join(args.in_folder, 'train.idx')
     path_imgrec = os.path.join(args.in_folder, 'train.rec')
-    
+
     imgrec = mx.recordio.MXIndexedRecordIO(path_imgidx, path_imgrec, 'r')
     s = imgrec.read_idx(0)
     header, _ = mx.recordio.unpack(s)
@@ -29,7 +40,7 @@ if __name__ == '__main__':
         assert len(label2range) == totnum - imgnum
     else:
         raise AttributeError('file with incorrect format')
-    
+
     for idx in imgidx:
         s = imgrec.read_idx(idx)
         header, img = mx.recordio.unpack(s)

@@ -17,15 +17,18 @@ def test_sgd(bs, cls, fdim, midw, lr, weight_decay, momentum):
     params = [logits.weight]
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(params,
-                    lr=lr, weight_decay=weight_decay, momentum=momentum)
+                                lr=lr,
+                                weight_decay=weight_decay,
+                                momentum=momentum)
 
     # setup ps client
     client = ParameterClient(0)
     client.add_matrix(midw, [cls, fdim])
     client.update_params({
-                'lr': lr,
-                'weight_decay': weight_decay,
-                'momentum': momentum})
+        'lr': lr,
+        'weight_decay': weight_decay,
+        'momentum': momentum
+    })
     client.set_matrix(midw, logits.weight.data.numpy(), force=True)
     rows = np.arange(cls)
 
@@ -49,7 +52,10 @@ def test_sgd(bs, cls, fdim, midw, lr, weight_decay, momentum):
 
         # parameter server sgd update
         # skip_decay=True since the grad has already been regularized
-        client.update_by_rows(midw, rows, logits.weight.grad.numpy(), skip_decay=True)
+        client.update_by_rows(midw,
+                              rows,
+                              logits.weight.grad.numpy(),
+                              skip_decay=True)
 
 
 if __name__ == '__main__':
@@ -57,17 +63,51 @@ if __name__ == '__main__':
             1. There is no precision loss during the transportation between client and server.
             2. The sgd algorithm of parameter server is compatible with PyTorch.
     """
-    test_cases = [
-        {'bs': 2, 'cls': 3, 'fdim': 4, 'midw': '0', 'lr': 0.01, 'weight_decay': 0, 'momentum': 0.9},
-        {'bs': 2, 'cls': 3, 'fdim': 4, 'midw': '0', 'lr': 0.01, 'weight_decay': 1e-4, 'momentum': 0},
-        {'bs': 32, 'cls': 1000, 'fdim': 256, 'midw': '1', 'lr': 0.01, 'weight_decay': 0, 'momentum': 0.9},
-        {'bs': 32, 'cls': 1000, 'fdim': 256, 'midw': '1', 'lr': 0.01, 'weight_decay': 1e-4, 'momentum': 0.0},
-        {'bs': 32, 'cls': 1000, 'fdim': 256, 'midw': '1', 'lr': 0.01, 'weight_decay': 1e-4, 'momentum': 0.9}
-    ]
+    test_cases = [{
+        'bs': 2,
+        'cls': 3,
+        'fdim': 4,
+        'midw': '0',
+        'lr': 0.01,
+        'weight_decay': 0,
+        'momentum': 0.9
+    }, {
+        'bs': 2,
+        'cls': 3,
+        'fdim': 4,
+        'midw': '0',
+        'lr': 0.01,
+        'weight_decay': 1e-4,
+        'momentum': 0
+    }, {
+        'bs': 32,
+        'cls': 1000,
+        'fdim': 256,
+        'midw': '1',
+        'lr': 0.01,
+        'weight_decay': 0,
+        'momentum': 0.9
+    }, {
+        'bs': 32,
+        'cls': 1000,
+        'fdim': 256,
+        'midw': '1',
+        'lr': 0.01,
+        'weight_decay': 1e-4,
+        'momentum': 0.0
+    }, {
+        'bs': 32,
+        'cls': 1000,
+        'fdim': 256,
+        'midw': '1',
+        'lr': 0.01,
+        'weight_decay': 1e-4,
+        'momentum': 0.9
+    }]
     for i, t in enumerate(test_cases):
         try:
-            test_sgd(t['bs'], t['cls'], t['fdim'], t['midw'],
-                    t['lr'], t['weight_decay'], t['momentum'])
+            test_sgd(t['bs'], t['cls'], t['fdim'], t['midw'], t['lr'],
+                     t['weight_decay'], t['momentum'])
             print('[Passed] {}-th test case: {}'.format(i, t))
         except Exception as err:
             print('[Failed] {}-th test case: {} ({})'.format(i, t, err))

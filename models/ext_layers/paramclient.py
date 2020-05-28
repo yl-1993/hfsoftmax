@@ -3,6 +3,7 @@ import json
 import numpy as np
 import time
 
+
 class ParameterClient():
     def __init__(self, _id):
         print('Connecting to ParamServer ...')
@@ -28,48 +29,33 @@ class ParameterClient():
         self._context.term()
 
     def _register(self):
-        msg = dict(
-            op='register'
-        )
+        msg = dict(op='register')
         self._socket.send_json(msg)
 
     def _exit(self):
-        msg = dict(
-            op='exit'
-        )
+        msg = dict(op='exit')
         self._socket.send_json(msg)
 
     def _send_array(self, data, flags=0, copy=True, track=False):
         """send a numpy array with metadata"""
         md = dict(
-            dtype = str(data.dtype),
-            shape = data.shape,
+            dtype=str(data.dtype),
+            shape=data.shape,
         )
-        self._socket.send_json(md, flags|zmq.SNDMORE)
+        self._socket.send_json(md, flags | zmq.SNDMORE)
         return self._socket.send(data, flags, copy=copy, track=track)
 
     def add_matrix(self, mid, shape):
-        msg = dict(
-            op='add_matrix',
-            mid=mid,
-            shape=shape
-        )
+        msg = dict(op='add_matrix', mid=mid, shape=shape)
         self._socket.send_json(msg)
 
     def set_matrix(self, mid, data, force=False):
-        msg = dict(
-            op='set_matrix',
-            mid=mid,
-            force=force
-        )
+        msg = dict(op='set_matrix', mid=mid, force=force)
         self._socket.send_json(msg, zmq.SNDMORE)
         self._send_array(data)
 
     def get_value_by_rows(self, mid, rows):
-        msg = dict(
-            op='get_value_by_rows',
-            mid=mid
-        )
+        msg = dict(op='get_value_by_rows', mid=mid)
         self._socket.send_json(msg, zmq.SNDMORE)
         self._send_array(rows)
         # receive data
@@ -95,41 +81,26 @@ class ParameterClient():
 
     def update_params(self, dic):
         assert len(dic) > 0
-        msg = dict(
-            op='update_params'
-        )
+        msg = dict(op='update_params')
         msg.update(dic)
         self._socket.send_json(msg)
 
     def update_by_rows(self, mid, rows, data, skip_decay=False):
-        msg = dict(
-            op='update_by_rows',
-            mid=mid,
-            skip_decay=skip_decay
-        )
+        msg = dict(op='update_by_rows', mid=mid, skip_decay=skip_decay)
         self._socket.send_json(msg, zmq.SNDMORE)
         self._send_array(rows, zmq.SNDMORE)
         self._send_array(data)
 
     def snapshot(self, path):
-        msg = dict(
-            op='snapshot',
-            path=path
-        )
+        msg = dict(op='snapshot', path=path)
         self._socket.send_json(msg)
 
     def load(self, path):
-        msg = dict(
-            op='resume',
-            path=path
-        )
+        msg = dict(op='resume', path=path)
         self._socket.send_json(msg)
 
     def resume(self, path):
-        msg = dict(
-            op='resume',
-            path=path
-        )
+        msg = dict(op='resume', path=path)
         self._socket.send_json(msg)
 
 

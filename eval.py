@@ -5,17 +5,18 @@ import models
 from utils import bin_loader, normalize
 from evaluation import evaluate
 
-
 model_names = sorted(name for name in models.__dict__
-    if name.islower() and not name.startswith("__")
-    and callable(models.__dict__[name]))
+                     if name.islower() and not name.startswith("__")
+                     and callable(models.__dict__[name]))
 
 parser = argparse.ArgumentParser(description='Evaluation')
-parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet50',
+parser.add_argument('--arch',
+                    '-a',
+                    metavar='ARCH',
+                    default='resnet50',
                     choices=model_names,
-                    help='model architecture: ' +
-                        ' | '.join(model_names) +
-                        ' (default: resnet18)')
+                    help='model architecture: ' + ' | '.join(model_names) +
+                    ' (default: resnet18)')
 parser.add_argument('-b', '--batch-size', default=128, type=int)
 parser.add_argument('--input-size', default=112, type=int)
 parser.add_argument('--feature-dim', default=256, type=int)
@@ -46,11 +47,14 @@ def main():
     features = np.load(args.output_path).reshape(-1, args.feature_dim)
     _, lbs = bin_loader(args.bin_file)
     print('feature shape: {}'.format(features.shape))
-    assert features.shape[0] == 2*len(lbs), "{} vs {}".format(features.shape[0], 2*len(lbs))
+    assert features.shape[0] == 2 * len(lbs), "{} vs {}".format(
+        features.shape[0], 2 * len(lbs))
 
     features = normalize(features)
-    _, _, acc, val, val_std, far = evaluate(features, lbs,
-                            nrof_folds=args.nfolds, distance_metric=0)
+    _, _, acc, val, val_std, far = evaluate(features,
+                                            lbs,
+                                            nrof_folds=args.nfolds,
+                                            distance_metric=0)
     print("accuracy: {:.4f}({:.4f})".format(acc.mean(), acc.std()))
 
 

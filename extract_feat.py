@@ -12,17 +12,18 @@ import models
 from utils import AverageMeter, load_ckpt, bin_loader
 from datasets import BinDataset
 
-
 model_names = sorted(name for name in models.__dict__
-    if name.islower() and not name.startswith("__")
-    and callable(models.__dict__[name]))
+                     if name.islower() and not name.startswith("__")
+                     and callable(models.__dict__[name]))
 
 parser = argparse.ArgumentParser(description='Feature Extractor')
-parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet50',
+parser.add_argument('--arch',
+                    '-a',
+                    metavar='ARCH',
+                    default='resnet50',
                     choices=model_names,
-                    help='model architecture: ' +
-                        ' | '.join(model_names) +
-                        ' (default: resnet18)')
+                    help='model architecture: ' + ' | '.join(model_names) +
+                    ' (default: resnet18)')
 parser.add_argument('-j', '--workers', default=1, type=int)
 parser.add_argument('-b', '--batch-size', default=128, type=int)
 parser.add_argument('--input-size', default=112, type=int)
@@ -37,6 +38,7 @@ class IdentityMapping(nn.Module):
     def __init__(self, base):
         super(IdentityMapping, self).__init__()
         self.base = base
+
     def forward(self, x):
         x = self.base(x)
         return x
@@ -58,7 +60,10 @@ def main():
     if args.load_path:
         if args.strict:
             classifier_keys = ['module.logits.weight', 'module.logits.bias']
-            load_ckpt(args.load_path, model, ignores=classifier_keys, strict=True)
+            load_ckpt(args.load_path,
+                      model,
+                      ignores=classifier_keys,
+                      strict=True)
         else:
             load_ckpt(args.load_path, model, strict=False)
 
@@ -67,15 +72,17 @@ def main():
     normalize = transforms.Normalize(mean=[0.5, 0.5, 0.5],
                                      std=[0.25, 0.25, 0.25])
 
-    test_loader = DataLoader(
-        BinDataset(args.bin_file,
-            transforms.Compose([
+    test_loader = DataLoader(BinDataset(
+        args.bin_file,
+        transforms.Compose([
             transforms.Resize(args.input_size),
             transforms.ToTensor(),
             normalize,
         ])),
-        batch_size=args.batch_size, shuffle=False,
-        num_workers=args.workers, pin_memory=True)
+                             batch_size=args.batch_size,
+                             shuffle=False,
+                             num_workers=args.workers,
+                             pin_memory=True)
 
     features = extract(test_loader, model)
     assert features.shape[1] == args.feature_dim

@@ -6,9 +6,7 @@ from torch.nn.parameter import Parameter
 
 from .ext_layers import HFSampler, HNSWSampler, Ident
 
-
-__all__ = ['Classifier', 'CosFaceClassifier',
-            'HFClassifier', 'HNSWClassifier']
+__all__ = ['Classifier', 'CosFaceClassifier', 'HFClassifier', 'HNSWClassifier']
 
 
 class Classifier(nn.Module):
@@ -28,7 +26,6 @@ class Classifier(nn.Module):
 
 
 class CosFaceClassifier(nn.Module):
-
     def __init__(self, base, feature_dim, num_classes, s=64, m=0.2, **kwargs):
         super(CosFaceClassifier, self).__init__()
         self.base = base
@@ -46,8 +43,8 @@ class CosFaceClassifier(nn.Module):
         self.weight.data.uniform_(-stdv, stdv)
 
     def __repr__(self):
-        return ('feature_dim={}, num_classes={}, s={}, m={}'
-                .format(self.feature_dim, self.num_classes, self.s, self.m))
+        return ('feature_dim={}, num_classes={}, s={}, m={}'.format(
+            self.feature_dim, self.num_classes, self.s, self.m))
 
     def forward(self, x, label):
         embed = self.base(x)
@@ -70,7 +67,8 @@ class HFClassifier(nn.Module):
         super(HFClassifier, self).__init__()
         self.base = base
         self.dropout = nn.Dropout(p=0.5)
-        self.hf_sampler = HFSampler(rank, feature_dim, sampler_num, num_classes)
+        self.hf_sampler = HFSampler(rank, feature_dim, sampler_num,
+                                    num_classes)
 
     def forward(self, x, labels):
         x = self.base(x)
@@ -88,7 +86,8 @@ class HNSWClassifier(nn.Module):
         super(HNSWClassifier, self).__init__()
         self.base = base
         self.dropout = nn.Dropout(p=0.5)
-        self.hnsw_sampler = HNSWSampler(rank, feature_dim, sampler_num, num_classes)
+        self.hnsw_sampler = HNSWSampler(rank, feature_dim, sampler_num,
+                                        num_classes)
 
     def forward(self, x, labels):
         x = self.base(x)
